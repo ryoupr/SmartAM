@@ -1,0 +1,342 @@
+use serde::{Deserialize, Serialize};
+
+mod ai_client;
+mod ai_usage;
+mod calendar;
+mod imap_client;
+mod oauth;
+mod smtp_client;
+pub mod trace;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccountConfig {
+    pub email: String,
+    pub auth_type: String,
+    pub password: String,
+    pub access_token: String,
+    pub imap_host: String,
+    pub imap_port: u16,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SmtpConfig {
+    pub email: String,
+    pub auth_type: String,
+    pub password: String,
+    pub access_token: String,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LlmConfig {
+    pub base_url: String,
+    pub model: String,
+    pub api_key: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct MailSummary {
+    pub uid: u32,
+    pub from: String,
+    pub subject: String,
+    pub date: String,
+    pub seen: bool,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct MailDetail {
+    pub uid: u32,
+    pub from: String,
+    pub to: String,
+    pub subject: String,
+    pub date: String,
+    pub body_text: String,
+    pub body_html: String,
+    pub attachments: Vec<Attachment>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Attachment {
+    pub index: usize,
+    pub filename: String,
+    pub mime_type: String,
+    pub size: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Nuance {
+    pub icon: String,
+    pub label: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FolderInfo {
+    pub name: String,
+    pub count: u32,
+}
+
+// IMAP
+#[tauri::command]
+fn frontend_trace(tag: String, msg: String) {
+    trace::trace(&format!("FE:{tag}"), &msg);
+}
+
+#[tauri::command]
+async fn test_imap_connection(config: AccountConfig) -> Result<String, String> {
+    trace::trace("CMD", &format!("test_imap_connection: {}", config.email));
+    imap_client::test_connection(&config).await
+}
+
+#[tauri::command]
+async fn fetch_mail_list(config: AccountConfig, folder: String, count: u32) -> Result<Vec<MailSummary>, String> {
+    trace::trace("CMD", &format!("fetch_mail_list: folder={} count={}", folder, count));
+    match imap_client::fetch_list(&config, &folder, count).await {
+        Ok(mails) => { trace::trace("CMD", &format!("fetch_mail_list: OK {} mails", mails.len())); Ok(mails) }
+        Err(e) => { trace::trace("CMD", &format!("fetch_mail_list: ERROR {}", e)); Err(e) }
+    }
+}
+
+#[tauri::command]
+async fn fetch_mail_detail(config: AccountConfig, folder: String, uid: u32) -> Result<MailDetail, String> {
+    trace::trace("CMD", &format!("fetch_mail_detail: uid={}", uid));
+    match imap_client::fetch_detail(&config, &folder, uid).await {
+        Ok(detail) => { trace::trace("CMD", &format!("fetch_mail_detail: OK uid={}", uid)); Ok(detail) }
+        Err(e) => { trace::trace("CMD", &format!("fetch_mail_detail: ERROR {}", e)); Err(e) }
+    }
+}
+
+#[tauri::command]
+async fn search_mails(config: AccountConfig, folder: String, query: String, limit: u32) -> Result<Vec<MailSummary>, String> {
+    trace::trace("CMD", &format!("search_mails: folder={} query={} limit={}", folder, query, limit));
+    imap_client::search_mails(&config, &folder, &query, limit).await
+}
+
+#[tauri::command]
+async fn fetch_mail_page(config: AccountConfig, folder: String, offset: u32, limit: u32) -> Result<(Vec<MailSummary>, u32), String> {
+    trace::trace("CMD", &format!("fetch_mail_page: folder={} offset={} limit={}", folder, offset, limit));
+    imap_client::fetch_mail_page(&config, &folder, offset, limit).await
+}
+
+#[tauri::command]
+async fn fetch_new_mails(config: AccountConfig, folder: String, since_uid: u32) -> Result<Vec<MailSummary>, String> {
+    trace::trace("CMD", &format!("fetch_new_mails: folder={} since_uid={}", folder, since_uid));
+    imap_client::fetch_new_mails(&config, &folder, since_uid).await
+}
+
+#[tauri::command]
+async fn fetch_folders(config: AccountConfig) -> Result<Vec<FolderInfo>, String> {
+    trace::trace("CMD", "fetch_folders");
+    imap_client::fetch_folders(&config).await
+}
+
+#[tauri::command]
+async fn fetch_thread(config: AccountConfig, folder: String, subject: String) -> Result<Vec<MailSummary>, String> {
+    trace::trace("CMD", &format!("fetch_thread: subject={}", subject));
+    imap_client::fetch_thread(&config, &folder, &subject).await
+}
+
+#[tauri::command]
+async fn download_attachment(config: AccountConfig, folder: String, uid: u32, part_index: usize, filename: String) -> Result<String, String> {
+    trace::trace("CMD", &format!("download_attachment: uid={} part={}", uid, part_index));
+    imap_client::download_attachment(&config, &folder, uid, part_index, &filename).await
+}
+
+#[tauri::command]
+async fn fetch_attachment_data(config: AccountConfig, folder: String, uid: u32, part_index: usize) -> Result<String, String> {
+    imap_client::fetch_attachment_data(&config, &folder, uid, part_index).await
+}
+
+#[tauri::command]
+async fn archive_mail(config: AccountConfig, folder: String, uid: u32) -> Result<String, String> {
+    trace::trace("CMD", &format!("archive_mail: uid={}", uid));
+    imap_client::archive_mail(&config, &folder, uid).await
+}
+
+#[tauri::command]
+async fn delete_mail(config: AccountConfig, folder: String, uid: u32) -> Result<String, String> {
+    trace::trace("CMD", &format!("delete_mail: uid={}", uid));
+    imap_client::delete_mail(&config, &folder, uid).await
+}
+
+#[tauri::command]
+async fn toggle_star(config: AccountConfig, folder: String, uid: u32, add: bool) -> Result<String, String> {
+    trace::trace("CMD", &format!("toggle_star: uid={} add={}", uid, add));
+    imap_client::toggle_star(&config, &folder, uid, add).await
+}
+
+#[tauri::command]
+fn set_mail_cache_max(max: usize) {
+    imap_client::set_cache_max(max);
+}
+
+#[tauri::command]
+async fn preload_mails(config: AccountConfig, folder: String, uids: Vec<u32>) -> Result<u32, String> {
+    trace::trace("CMD", &format!("preload_mails: {} uids", uids.len()));
+    imap_client::preload_mails(&config, &folder, uids).await
+}
+
+// SMTP
+#[tauri::command]
+async fn send_mail(config: SmtpConfig, to: Vec<String>, cc: Vec<String>, bcc: Vec<String>, subject: String, body: String) -> Result<String, String> {
+    trace::trace("CMD", &format!("send_mail: to={:?}", to));
+    smtp_client::send_mail(&config, &to, &cc, &bcc, &subject, &body).await
+}
+
+#[tauri::command]
+async fn send_mail_with_attachments(config: SmtpConfig, to: Vec<String>, cc: Vec<String>, bcc: Vec<String>, subject: String, body: String, attachment_paths: Vec<String>) -> Result<String, String> {
+    trace::trace("CMD", &format!("send_mail_with_attachments: {} files", attachment_paths.len()));
+    smtp_client::send_mail_with_attachments(&config, &to, &cc, &bcc, &subject, &body, &attachment_paths).await
+}
+
+#[tauri::command]
+async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<String>, String> {
+    trace::trace("CMD", "list_bedrock_models");
+    let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models?byInferenceType=ON_DEMAND");
+    let client = reqwest::Client::new();
+    let resp = client.get(&url)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !resp.status().is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("モデル一覧取得失敗: {body}"));
+    }
+    #[derive(serde::Deserialize)]
+    struct Resp { #[serde(rename = "modelSummaries")] model_summaries: Vec<Model> }
+    #[derive(serde::Deserialize)]
+    struct Model { #[serde(rename = "modelId")] model_id: String }
+    let data: Resp = resp.json().await.map_err(|e| format!("{e}"))?;
+    let ids: Vec<String> = data.model_summaries.into_iter().map(|m| m.model_id).collect();
+    trace::trace("CMD", &format!("list_bedrock_models: {} models", ids.len()));
+    Ok(ids)
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| format!("URL open failed: {e}"))
+}
+
+#[tauri::command]
+fn get_ai_usage() -> ai_usage::UsageSummary {
+    ai_usage::get_summary()
+}
+
+#[tauri::command]
+fn set_ai_budget(limit_usd: f64) {
+    ai_usage::set_budget_limit(limit_usd);
+}
+
+// AI
+#[tauri::command]
+async fn ai_summarize(llm: LlmConfig, mail_body: String) -> Result<String, String> {
+    trace::trace("CMD", "ai_summarize");
+    ai_client::summarize(&llm, &mail_body).await
+}
+
+#[tauri::command]
+async fn ai_draft_nuances(llm: LlmConfig, mail_body: String) -> Result<Vec<Nuance>, String> {
+    trace::trace("CMD", "ai_draft_nuances");
+    ai_client::draft_nuances(&llm, &mail_body).await
+}
+
+#[tauri::command]
+async fn ai_draft_reply(llm: LlmConfig, mail_body: String, nuance: String, instruction: String) -> Result<String, String> {
+    trace::trace("CMD", &format!("ai_draft_reply: nuance={}", nuance));
+    ai_client::draft_reply(&llm, &mail_body, &nuance, &instruction).await
+}
+
+#[tauri::command]
+async fn ai_translate(llm: LlmConfig, text: String, target_lang: String) -> Result<String, String> {
+    trace::trace("CMD", &format!("ai_translate: lang={}", target_lang));
+    ai_client::translate(&llm, &text, &target_lang).await
+}
+
+// OAuth
+#[tauri::command]
+async fn google_oauth_login() -> Result<oauth::OAuthTokens, String> {
+    trace::trace("CMD", "google_oauth_login");
+    oauth::start_flow().await
+}
+
+#[tauri::command]
+async fn google_oauth_refresh(refresh_token: String) -> Result<oauth::OAuthTokens, String> {
+    trace::trace("CMD", "google_oauth_refresh");
+    oauth::refresh(&refresh_token).await
+}
+
+#[tauri::command]
+async fn list_google_calendars(access_token: String) -> Result<Vec<String>, String> {
+    trace::trace("CMD", "list_google_calendars");
+    let client = reqwest::Client::new();
+    let resp = client.get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
+        .bearer_auth(&access_token)
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !resp.status().is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("カレンダー一覧取得失敗: {body}"));
+    }
+    #[derive(serde::Deserialize)]
+    struct Resp { items: Vec<Cal> }
+    #[derive(serde::Deserialize)]
+    struct Cal { summary: String }
+    let data: Resp = resp.json().await.map_err(|e| format!("{e}"))?;
+    Ok(data.items.into_iter().map(|c| c.summary).collect())
+}
+
+// Calendar
+#[tauri::command]
+async fn detect_calendar_events(llm: LlmConfig, mail_body: String) -> Result<Vec<calendar::CalendarEvent>, String> {
+    trace::trace("CMD", "detect_calendar_events");
+    calendar::detect_events(&llm, &mail_body).await
+}
+
+#[tauri::command]
+async fn register_calendar_event(event: calendar::CalendarEvent, calendar_name: String) -> Result<String, String> {
+    trace::trace("CMD", &format!("register_calendar_event: {}", event.title));
+    calendar::register_apple_calendar(&event, &calendar_name).await
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    trace::init();
+    trace::trace("APP", "=== SmartAM starting ===");
+
+    let builder = tauri::Builder::default();
+    trace::trace("APP", "Builder created");
+
+    builder
+        .setup(|app| {
+            trace::trace("APP", "setup: begin");
+            app.handle().plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())?;
+            trace::trace("APP", "setup: log plugin ok");
+            app.handle().plugin(tauri_plugin_store::Builder::default().build())?;
+            trace::trace("APP", "setup: store plugin ok");
+            app.handle().plugin(tauri_plugin_notification::init())?;
+            trace::trace("APP", "setup: notification plugin ok");
+            app.handle().plugin(tauri_plugin_dialog::init())?;
+            trace::trace("APP", "setup: dialog plugin ok");
+            trace::trace("APP", "setup: complete");
+            // Fetch Bedrock pricing in background
+            tauri::async_runtime::spawn(ai_usage::fetch_pricing());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            frontend_trace,
+            test_imap_connection, fetch_mail_list, fetch_mail_detail, fetch_new_mails, fetch_mail_page, search_mails,
+            fetch_folders, fetch_thread, download_attachment, fetch_attachment_data,
+            archive_mail, delete_mail, toggle_star,
+            preload_mails, set_mail_cache_max,
+            send_mail, send_mail_with_attachments,
+            list_bedrock_models,
+            get_ai_usage, set_ai_budget,
+            ai_summarize, ai_draft_nuances, ai_draft_reply, ai_translate,
+            google_oauth_login, google_oauth_refresh, list_google_calendars,
+            detect_calendar_events, register_calendar_event,
+            open_external_url,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+
+    trace::trace("APP", "=== SmartAM exited ===");
+}
