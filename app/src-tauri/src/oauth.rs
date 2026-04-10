@@ -5,11 +5,15 @@ use tokio::net::TcpListener;
 
 fn client_id() -> String {
     std::env::var("GOOGLE_OAUTH_CLIENT_ID")
-        .expect("GOOGLE_OAUTH_CLIENT_ID must be set")
+        .unwrap_or_else(|_| option_env!("GOOGLE_OAUTH_CLIENT_ID")
+            .expect("GOOGLE_OAUTH_CLIENT_ID not set (build or runtime)")
+            .to_string())
 }
 fn client_secret() -> String {
     std::env::var("GOOGLE_OAUTH_CLIENT_SECRET")
-        .expect("GOOGLE_OAUTH_CLIENT_SECRET must be set")
+        .unwrap_or_else(|_| option_env!("GOOGLE_OAUTH_CLIENT_SECRET")
+            .expect("GOOGLE_OAUTH_CLIENT_SECRET not set (build or runtime)")
+            .to_string())
 }
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
