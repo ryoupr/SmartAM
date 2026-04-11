@@ -18,3 +18,4 @@ Thumbs.db
 *.log
 /var/log/smartam/
 .git-old/
+SmartAM-0.1.0-source.zip
