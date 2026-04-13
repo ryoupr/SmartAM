@@ -412,6 +412,13 @@
       return;
     }
 
+    // Arrow keys: navigate mails when detail is open
+    if (selectedMail && (key === 'ArrowDown' || key === 'ArrowUp')) {
+      e.preventDefault();
+      execAction(key === 'ArrowDown' ? 'nextMail' : 'prevMail');
+      return;
+    }
+
     const rm = reverseMap();
     const action = rm.get(key);
     if (action) { e.preventDefault(); execAction(action); }
