@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 mod ai_client;
 mod ai_usage;
 mod calendar;
+mod ics_parser;
 mod imap_client;
 mod oauth;
 mod smtp_client;
@@ -297,6 +298,14 @@ async fn register_calendar_event(event: calendar::CalendarEvent, calendar_name: 
     calendar::register_apple_calendar(&event, &calendar_name).await
 }
 
+// ICS parsing
+#[tauri::command]
+fn parse_ics_attachment(data: String) -> Result<Vec<ics_parser::CalendarEvent>, String> {
+    let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &data)
+        .map_err(|e| format!("base64 decode error: {e}"))?;
+    ics_parser::parse_ics(&bytes)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     trace::init();
@@ -334,6 +343,7 @@ pub fn run() {
             google_oauth_login, google_oauth_refresh, list_google_calendars,
             detect_calendar_events, register_calendar_event,
             open_external_url,
+            parse_ics_attachment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
