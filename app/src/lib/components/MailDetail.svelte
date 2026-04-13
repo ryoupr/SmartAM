@@ -3,7 +3,8 @@
   import { slide } from 'svelte/transition';
   import AiPanel from './AiPanel.svelte';
   import CalendarPanel from './CalendarPanel.svelte';
-  import type { MailDetail, Attachment } from '$lib/types';
+  import EventCard from './EventCard.svelte';
+  import type { MailDetail, Attachment, CalendarEvent } from '$lib/types';
 
   let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, calendarName = '仕事', calendarNames = [] }: {
     mail: MailDetail | null;
@@ -28,6 +29,7 @@
   let prevUid: number | null = $state(null);
   let translatedBody: string | null = $state(null);
   let translating = $state(false);
+  let icsEvent: CalendarEvent | null = $state(null);
 
   // Reset panels when mail changes
   $effect(() => {
@@ -35,7 +37,15 @@
     if (uid !== prevUid) {
       openPanels = new Set();
       translatedBody = null;
+      icsEvent = null;
       prevUid = uid;
+      // Detect and parse ics attachment
+      const icsAtt = mail?.attachments.find(a => a.filename.endsWith('.ics'));
+      if (icsAtt) {
+        onFetchAttachmentData(icsAtt.index).then(b64 =>
+          invoke<CalendarEvent[]>('parse_ics_attachment', { data: b64 })
+        ).then(evts => { if (evts.length > 0) icsEvent = evts[0]; }).catch(() => {});
+      }
     }
   });
 
@@ -160,6 +170,14 @@
       <div transition:slide={{ duration: 150 }}>
         <CalendarPanel mailBody={getMailText()} {llmConfig} {calendarName} {calendarNames} onClose={() => togglePanel('calendar')} />
       </div>
+    {/if}
+
+    {#if icsEvent}
+      <EventCard event={icsEvent}
+        onAccept={() => {}}
+        onDecline={() => {}}
+        onAddToCalendar={() => { if (!openPanels.has('calendar')) togglePanel('calendar'); }}
+      />
     {/if}
 
     {#if translatedBody !== null}

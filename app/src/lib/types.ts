@@ -37,3 +37,14 @@ export interface FolderInfo {
   name: string;
   count: number;
 }
+
+export interface CalendarEvent {
+  summary: string;
+  dtstart: string;
+  dtend: string;
+  location: string;
+  organizer: string;
+  attendees: string[];
+  status: string;
+  description: string;
+}
