@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="1. メイン画面（複数アカウント）" id="0">
-        <mxGraphModel dx="816" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -179,7 +179,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="2. 設定 - アカウント管理" id="1">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -271,7 +271,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="3. アカウント追加モーダル" id="2">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -333,7 +333,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="4. 設定 - 署名管理" id="3">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -401,7 +401,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="4b. 設定 - LLMプロバイダー" id="4b">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -562,7 +562,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="4c. 設定 - カレンダー連携" id="4c">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1574,7 +1574,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="8b. 削除確認ダイアログ" id="8b">
-        <mxGraphModel dx="1456" dy="797" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1597,7 +1597,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="1b. メイン画面 - 検索結果" id="1b">
-        <mxGraphModel dx="1456" dy="797" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1647,7 +1647,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="5c. AI処理中（ローディング）" id="5c">
-        <mxGraphModel dx="1456" dy="797" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1688,7 +1688,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="1c. 添付ファイルプレビュー" id="1c">
-        <mxGraphModel dx="1048" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1717,7 +1717,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="4e. 設定 - キーボードショートカット" id="4e">
-        <mxGraphModel dx="816" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -1947,7 +1947,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="25. invite.ics イベント表示" id="25">
-        <mxGraphModel dx="816" dy="696" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1624" dy="1157" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -2002,14 +2002,11 @@
                 <mxCell id="ev_desc" value="Q1の振り返りとQ2のOKRレビュー、リソース配分について議論します。" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#313244;strokeColor=none;fontColor=#a6adc8;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;" parent="win" vertex="1">
                     <mxGeometry x="20" y="346" width="520" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="btn_accept" value="✅ 承諾" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#a6e3a1;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
+                <mxCell id="btn_accept" value="承諾" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#a6e3a1;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
                     <mxGeometry x="20" y="396" width="80" height="26" as="geometry"/>
                 </mxCell>
-                <mxCell id="btn_decline" value="✕ 辞退" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f38ba8;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
+                <mxCell id="btn_decline" value="辞退" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f38ba8;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
                     <mxGeometry x="108" y="396" width="80" height="26" as="geometry"/>
-                </mxCell>
-                <mxCell id="btn_cal" value="📅 カレンダーに登録" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#89b4fa;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
-                    <mxGeometry x="196" y="396" width="120" height="26" as="geometry"/>
                 </mxCell>
                 <mxCell id="ev_toast" value="✅ 承諾しました" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#313244;strokeColor=none;fontColor=#a6e3a1;" parent="win" vertex="1">
                     <mxGeometry x="20" y="430" width="120" height="22" as="geometry"/>

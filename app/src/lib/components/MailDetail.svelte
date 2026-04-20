@@ -177,7 +177,6 @@
       <EventCard event={icsEvent}
         onAccept={async () => { await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true }); }}
         onDecline={async () => { await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false }); }}
-        onAddToCalendar={() => { if (!openPanels.has('calendar')) togglePanel('calendar'); }}
       />
     {/if}
 
