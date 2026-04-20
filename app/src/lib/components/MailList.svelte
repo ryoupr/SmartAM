@@ -60,12 +60,12 @@
   .search input::placeholder { color:var(--overlay) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
   .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px }
-  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent }
+  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box }
   .mail-item:hover { background:var(--surface0) }
   .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }
   .mail-item.unread .from { font-weight:700 }
   .mail-header { display:flex;justify-content:space-between;margin-bottom:4px }
-  .from { color:var(--text);font-size:11px }
+  .from { color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0 }
   .date { color:var(--overlay);font-size:9px }
   .subject { color:var(--text);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
   .empty { color:var(--overlay);text-align:center;padding:40px;font-size:12px }
