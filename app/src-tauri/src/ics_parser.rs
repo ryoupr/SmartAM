@@ -1,9 +1,10 @@
 use ical::IcalParser;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CalendarEvent {
+    pub uid: String,
     pub summary: String,
     pub dtstart: String,
     pub dtend: String,
@@ -50,6 +51,7 @@ pub fn parse_ics(data: &[u8]) -> Result<Vec<CalendarEvent>, String> {
                 .unwrap_or_default();
 
             events.push(CalendarEvent {
+                uid: prop("UID"),
                 summary: prop("SUMMARY"),
                 dtstart: prop("DTSTART"),
                 dtend: prop("DTEND"),
@@ -62,4 +64,30 @@ pub fn parse_ics(data: &[u8]) -> Result<Vec<CalendarEvent>, String> {
         }
     }
     Ok(events)
+}
+
+pub fn generate_reply_ics(event: &CalendarEvent, my_email: &str, accept: bool) -> String {
+    let partstat = if accept { "ACCEPTED" } else { "DECLINED" };
+    format!(
+        "BEGIN:VCALENDAR\r\n\
+         VERSION:2.0\r\n\
+         PRODID:-//SmartAM//EN\r\n\
+         METHOD:REPLY\r\n\
+         BEGIN:VEVENT\r\n\
+         UID:{uid}\r\n\
+         DTSTART:{dtstart}\r\n\
+         DTEND:{dtend}\r\n\
+         SUMMARY:{summary}\r\n\
+         ORGANIZER:mailto:{organizer}\r\n\
+         ATTENDEE;PARTSTAT={partstat}:mailto:{attendee}\r\n\
+         END:VEVENT\r\n\
+         END:VCALENDAR\r\n",
+        uid = event.uid,
+        dtstart = event.dtstart,
+        dtend = event.dtend,
+        summary = event.summary,
+        organizer = event.organizer,
+        partstat = partstat,
+        attendee = my_email,
+    )
 }

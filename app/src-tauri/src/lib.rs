@@ -306,6 +306,15 @@ fn parse_ics_attachment(data: String) -> Result<Vec<ics_parser::CalendarEvent>, 
     ics_parser::parse_ics(&bytes)
 }
 
+#[tauri::command]
+async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEvent, accept: bool) -> Result<String, String> {
+    let action = if accept { "ACCEPTED" } else { "DECLINED" };
+    trace::trace("CMD", &format!("respond_calendar_invite: {} {}", event.summary, action));
+    let ics = ics_parser::generate_reply_ics(&event, &smtp.email, accept);
+    let subject = format!("{}: {}", if accept { "承諾" } else { "辞退" }, event.summary);
+    smtp_client::send_calendar_response(&smtp, &event.organizer, &subject, &ics).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     trace::init();
@@ -344,6 +353,7 @@ pub fn run() {
             detect_calendar_events, register_calendar_event,
             open_external_url,
             parse_ics_attachment,
+            respond_calendar_invite,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
