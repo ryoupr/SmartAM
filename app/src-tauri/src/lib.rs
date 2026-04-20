@@ -316,6 +316,34 @@ async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEv
 }
 
 #[tauri::command]
+async fn get_calendar_event_status(access_token: String, ics_uid: String, my_email: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events?iCalUID={}",
+        ics_uid
+    );
+    let resp = client.get(&url).bearer_auth(&access_token)
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !resp.status().is_success() { return Ok("unknown".into()); }
+
+    #[derive(serde::Deserialize)]
+    struct EventList { items: Vec<GEvent> }
+    #[derive(serde::Deserialize)]
+    struct GEvent { attendees: Option<Vec<Att>> }
+    #[derive(serde::Deserialize)]
+    struct Att { email: String, #[serde(rename = "responseStatus")] response_status: String, #[serde(rename = "self", default)] is_self: bool }
+
+    let list: EventList = resp.json().await.map_err(|e| format!("{e}"))?;
+    let ev = match list.items.first() { Some(e) => e, None => return Ok("unknown".into()) };
+    let my_lower = my_email.to_lowercase();
+    let status = ev.attendees.as_ref()
+        .and_then(|atts| atts.iter().find(|a| a.email.to_lowercase() == my_lower || a.is_self))
+        .map(|a| a.response_status.clone())
+        .unwrap_or_else(|| "unknown".into());
+    Ok(status)
+}
+
+#[tauri::command]
 async fn respond_google_calendar_invite(access_token: String, ics_uid: String, my_email: String, accept: bool) -> Result<String, String> {
     let status = if accept { "accepted" } else { "declined" };
     trace::trace("CMD", &format!("respond_google_calendar_invite: {} {}", ics_uid, status));
@@ -408,6 +436,7 @@ pub fn run() {
             parse_ics_attachment,
             respond_calendar_invite,
             respond_google_calendar_invite,
+            get_calendar_event_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

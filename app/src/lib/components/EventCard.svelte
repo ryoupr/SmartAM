@@ -60,7 +60,7 @@
   {#if event.location}<div class="ev-row">📍 {event.location}</div>{/if}
   {#if event.organizer}<div class="ev-row">👤 主催: {event.organizer}</div>{/if}
   {#if event.attendees.length > 0}<div class="ev-row">👥 参加者: {attendeeSummary}</div>{/if}
-  {#if event.description}<div class="ev-desc">{event.description}</div>{/if}
+  {#if event.description}<div class="ev-desc">{event.description.replace(/<br\s*\/?>/gi, '\n').replace(/\\n/g, '\n')}</div>{/if}
   <div class="ev-actions">
     <button class="btn-accept" disabled={responding} onclick={() => handleResponse(onAccept, '承諾')}>承諾</button>
     <button class="btn-decline" disabled={responding} onclick={() => handleResponse(onDecline, '辞退')}>辞退</button>

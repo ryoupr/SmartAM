@@ -45,7 +45,20 @@
       if (icsAtt) {
         onFetchAttachmentData(icsAtt.index).then(b64 =>
           invoke<CalendarEvent[]>('parse_ics_attachment', { data: b64 })
-        ).then(evts => { if (evts.length > 0) icsEvent = evts[0]; }).catch(() => {});
+        ).then(async evts => {
+          if (evts.length > 0) {
+            icsEvent = evts[0];
+            // Fetch live status from Google Calendar
+            if (smtpConfig?.auth_type === 'oauth' && icsEvent.uid) {
+              try {
+                const status = await invoke<string>('get_calendar_event_status', {
+                  accessToken: smtpConfig.access_token, icsUid: icsEvent.uid, myEmail: smtpConfig.email
+                });
+                if (status !== 'unknown') icsEvent = { ...icsEvent, status: status.toUpperCase() };
+              } catch {}
+            }
+          }
+        }).catch(() => {});
       }
     }
   });
@@ -181,6 +194,7 @@
           } else {
             await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true });
           }
+          icsEvent = { ...icsEvent!, status: 'ACCEPTED' };
         }}
         onDecline={async () => {
           if (smtpConfig?.auth_type === 'oauth') {
@@ -188,6 +202,7 @@
           } else {
             await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false });
           }
+          icsEvent = { ...icsEvent!, status: 'DECLINED' };
         }}
       />
     {/if}
