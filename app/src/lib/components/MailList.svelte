@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { MailSummary } from '$lib/types';
+  import { formatMailDate } from '$lib/store';
 
-  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200 }: {
+  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
     mails: MailSummary[];
     selectedUid: number | null;
     onSelect: (uid: number) => void;
@@ -11,6 +12,8 @@
     loadingMore?: boolean;
     searchQuery?: string;
     pageSize?: number;
+    dateFormat?: string;
+    timezone?: string;
   } = $props();
 
   function handleScroll(e: Event) {
@@ -39,7 +42,7 @@
       <button class="mail-item" class:selected={selectedUid === mail.uid} class:unread={!mail.seen} onclick={() => onSelect(mail.uid)}>
         <div class="mail-header">
           <span class="from">{mail.from}</span>
-          <span class="date">{mail.date}</span>
+          <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
         </div>
         <div class="subject">{mail.subject}</div>
       </button>
@@ -60,12 +63,14 @@
   .search input::placeholder { color:var(--overlay) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
   .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px }
-  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent }
+  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box }
   .mail-item:hover { background:var(--surface0) }
   .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }
+  .mail-item.unread { background:rgba(137,180,250,0.06) }
   .mail-item.unread .from { font-weight:700 }
+  .mail-item.unread .from::before { content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:6px;vertical-align:middle }
   .mail-header { display:flex;justify-content:space-between;margin-bottom:4px }
-  .from { color:var(--text);font-size:11px }
+  .from { color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0 }
   .date { color:var(--overlay);font-size:9px }
   .subject { color:var(--text);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
   .empty { color:var(--overlay);text-align:center;padding:40px;font-size:12px }

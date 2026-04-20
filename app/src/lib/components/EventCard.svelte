@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { CalendarEvent } from '$lib/types';
 
-  let { event, onAccept, onDecline }: {
+  let { event, onAccept, onDecline, conflicts = [] }: {
     event: CalendarEvent;
     onAccept: () => Promise<void>;
     onDecline: () => Promise<void>;
+    conflicts?: string[];
   } = $props();
 
   let responding = $state(false);
@@ -17,7 +18,7 @@
       await action();
       toast = `✅ ${label}しました`;
     } catch (e) { toast = `❌ ${e}`; }
-    finally { responding = false; }
+    finally { responding = false; setTimeout(() => toast = '', 3000); }
   }
 
   function formatDt(raw: string): string {
@@ -75,6 +76,9 @@
   {#if event.organizer}<div class="ev-row">👤 主催: {event.organizer}</div>{/if}
   {#if event.attendees.length > 0}<div class="ev-row">👥 参加者: {attendeeSummary}</div>{/if}
   {#if event.description}<div class="ev-desc">{cleanDescription(event.description)}</div>{/if}
+  {#if conflicts.length > 0}
+    <div class="ev-conflict">⚠️ 同時間帯に {conflicts.length} 件の予定があります: {conflicts.join(', ')}</div>
+  {/if}
   <div class="ev-actions">
     <button class="btn-accept" disabled={responding || event.status === 'ACCEPTED'} onclick={() => handleResponse(onAccept, '承諾')}>承諾</button>
     <button class="btn-decline" disabled={responding || event.status === 'DECLINED'} onclick={() => handleResponse(onDecline, '辞退')}>辞退</button>
@@ -92,6 +96,7 @@
   .ev-name { font-size:13px;font-weight:700;margin-bottom:6px }
   .ev-row { font-size:11px;color:var(--subtext);margin-bottom:4px }
   .ev-desc { font-size:11px;color:var(--subtext);background:var(--surface0);padding:8px;border-radius:4px;margin:8px 0;white-space:pre-wrap }
+  .ev-conflict { font-size:10px;color:var(--yellow);background:rgba(249,226,175,0.1);border:1px solid var(--yellow);border-radius:4px;padding:6px 8px;margin:6px 0 }
   .ev-actions { display:flex;gap:6px;margin-top:10px }
   .ev-actions button { padding:4px 12px;border-radius:6px;border:none;font-size:10px;font-weight:700;cursor:pointer;color:var(--base) }
   .btn-accept { background:var(--green) }
