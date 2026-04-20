@@ -30,8 +30,8 @@
   let prevUid: number | null = $state(null);
   let translatedBody: string | null = $state(null);
   let translating = $state(false);
-  let icsEvent: CalendarEvent | null = $state(null);
-  let conflicts: string[] = $state([]);
+  let icsEvents: CalendarEvent[] = $state([]);
+  let conflictsMap: Record<string, string[]> = $state({});
 
   // Reset panels when mail changes
   $effect(() => {
@@ -39,8 +39,8 @@
     if (uid !== prevUid) {
       openPanels = new Set();
       translatedBody = null;
-      icsEvent = null;
-      conflicts = [];
+      icsEvents = [];
+      conflictsMap = {};
       prevUid = uid;
       // Detect and parse ics attachment
       const icsAtt = mail?.attachments.find(a => a.filename.endsWith('.ics'));
@@ -49,26 +49,29 @@
           invoke<CalendarEvent[]>('parse_ics_attachment', { data: b64 })
         ).then(async evts => {
           if (evts.length > 0) {
-            icsEvent = evts[0];
-            // Fetch live status from Google Calendar
-            if (smtpConfig?.auth_type === 'oauth' && icsEvent.uid) {
-              try {
-                const status = await invoke<string>('get_calendar_event_status', {
-                  accessToken: smtpConfig.access_token, icsUid: icsEvent.uid, myEmail: smtpConfig.email
-                });
-                if (status !== 'unknown') icsEvent = { ...icsEvent, status: status.toUpperCase() };
-              } catch {}
-              // Check for conflicting events
-              try {
-                const toRfc = (s: string) => {
-                  const m = s.replace(/[^0-9T]/g, '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/);
-                  return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]||'00'}Z` : s;
-                };
-                const c = await invoke<string[]>('check_calendar_conflicts', {
-                  accessToken: smtpConfig.access_token, timeMin: toRfc(icsEvent.dtstart), timeMax: toRfc(icsEvent.dtend), excludeUid: icsEvent.uid
-                });
-                conflicts = c;
-              } catch {}
+            icsEvents = evts;
+            if (smtpConfig?.auth_type === 'oauth') {
+              const toRfc = (s: string) => {
+                const m = s.replace(/[^0-9T]/g, '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/);
+                return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]||'00'}Z` : s;
+              };
+              for (let i = 0; i < icsEvents.length; i++) {
+                const ev = icsEvents[i];
+                if (!ev.uid) continue;
+                try {
+                  const status = await invoke<string>('get_calendar_event_status', {
+                    accessToken: smtpConfig.access_token, icsUid: ev.uid, myEmail: smtpConfig.email
+                  });
+                  if (status !== 'unknown') icsEvents[i] = { ...ev, status: status.toUpperCase() };
+                } catch {}
+                try {
+                  const c = await invoke<string[]>('check_calendar_conflicts', {
+                    accessToken: smtpConfig.access_token, timeMin: toRfc(ev.dtstart), timeMax: toRfc(ev.dtend), excludeUid: ev.uid
+                  });
+                  if (c.length > 0) conflictsMap[ev.uid] = c;
+                } catch {}
+              }
+              icsEvents = [...icsEvents]; // trigger reactivity
             }
           }
         }).catch(() => {});
@@ -175,7 +178,7 @@
 
     {#if mail.attachments.length > 0}
       <div class="attachments">
-        {#each mail.attachments as att}
+        {#each [...mail.attachments].sort((a, b) => (b.filename.endsWith('.ics') ? 1 : 0) - (a.filename.endsWith('.ics') ? 1 : 0)) as att}
           <button class="att-chip" onclick={() => openPreview(att)}>
             📄 {att.filename} ({formatSize(att.size)})
           </button>
@@ -199,26 +202,26 @@
       </div>
     {/if}
 
-    {#if icsEvent}
-      <EventCard event={icsEvent} {conflicts}
+    {#each icsEvents as ev, i}
+      <EventCard event={ev} conflicts={conflictsMap[ev.uid] ?? []}
         onAccept={async () => {
           if (smtpConfig?.auth_type === 'oauth') {
-            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: true });
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: ev.uid, myEmail: smtpConfig.email, accept: true });
           } else {
-            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true });
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: ev, accept: true });
           }
-          icsEvent = { ...icsEvent!, status: 'ACCEPTED' };
+          icsEvents[i] = { ...ev, status: 'ACCEPTED' };
         }}
         onDecline={async () => {
           if (smtpConfig?.auth_type === 'oauth') {
-            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: false });
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: ev.uid, myEmail: smtpConfig.email, accept: false });
           } else {
-            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false });
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: ev, accept: false });
           }
-          icsEvent = { ...icsEvent!, status: 'DECLINED' };
+          icsEvents[i] = { ...ev, status: 'DECLINED' };
         }}
       />
-    {/if}
+    {/each}
 
     {#if translatedBody !== null}
       {#if mail.body_html}

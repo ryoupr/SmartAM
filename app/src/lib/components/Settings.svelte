@@ -22,6 +22,7 @@
   let googleCalLoading = $state(false);
   let recordingAction: string | null = $state(null);
   let scConflict = $state('');
+  let saveToast = $state(false);
 
   type UsageSummary = { month: string; models: { model: string; input_tokens: number; output_tokens: number; cost_usd: number; requests: number }[]; total_cost_usd: number; budget_limit_usd: number; budget_remaining_usd: number };
   let aiUsage: UsageSummary | null = $state(null);
@@ -436,7 +437,10 @@
         {/if}
       </div>
     </div>
-    <div class="ftr"><button class="btn-save" onclick={() => onSave(local)}>保存</button></div>
+    <div class="ftr">
+      {#if saveToast}<span class="save-toast">✅ 保存しました</span>{/if}
+      <button class="btn-save" onclick={() => { onSave(local); saveToast = true; setTimeout(() => saveToast = false, 3000); }}>保存</button>
+    </div>
   </div>
 </div>
 
@@ -480,6 +484,7 @@
   .fl input::placeholder,.fl select::placeholder { color:var(--surface1);opacity:1 }
   .ftr { display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--surface1) }
   .btn-save { padding:8px 24px;border-radius:6px;border:none;background:var(--mauve);color:var(--base);font-weight:700;cursor:pointer }
+  .save-toast { color:var(--green);font-size:11px;margin-right:12px }
   .divider { display:flex;align-items:center;gap:8px;margin:12px 0 8px;color:var(--overlay);font-size:9px }
   .divider::before,.divider::after { content:'';flex:1;height:1px;background:var(--surface1) }
   .usage-row { display:flex;flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px solid var(--surface1);font-size:10px }

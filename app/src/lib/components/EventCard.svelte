@@ -18,7 +18,7 @@
       await action();
       toast = `✅ ${label}しました`;
     } catch (e) { toast = `❌ ${e}`; }
-    finally { responding = false; }
+    finally { responding = false; setTimeout(() => toast = '', 3000); }
   }
 
   function formatDt(raw: string): string {

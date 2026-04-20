@@ -66,7 +66,9 @@
   .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box }
   .mail-item:hover { background:var(--surface0) }
   .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }
+  .mail-item.unread { background:rgba(137,180,250,0.06) }
   .mail-item.unread .from { font-weight:700 }
+  .mail-item.unread .from::before { content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:6px;vertical-align:middle }
   .mail-header { display:flex;justify-content:space-between;margin-bottom:4px }
   .from { color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0 }
   .date { color:var(--overlay);font-size:9px }
