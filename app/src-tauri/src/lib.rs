@@ -330,11 +330,22 @@ async fn check_calendar_conflicts(access_token: String, time_min: String, time_m
     #[derive(serde::Deserialize)]
     struct EventList { items: Option<Vec<GEvent>> }
     #[derive(serde::Deserialize)]
-    struct GEvent { summary: Option<String>, #[serde(rename = "iCalUID")] ical_uid: Option<String> }
+    struct GEvent { summary: Option<String>, #[serde(rename = "iCalUID")] ical_uid: Option<String>, start: Option<EventTime>, status: Option<String>, attendees: Option<Vec<ConflictAtt>> }
+    #[derive(serde::Deserialize)]
+    struct EventTime { #[serde(rename = "dateTime")] date_time: Option<String> }
+    #[derive(serde::Deserialize)]
+    struct ConflictAtt { #[serde(rename = "self", default)] is_self: bool, #[serde(rename = "responseStatus")] response_status: Option<String> }
 
     let list: EventList = resp.json().await.map_err(|e| format!("{e}"))?;
     let conflicts: Vec<String> = list.items.unwrap_or_default().into_iter()
         .filter(|e| e.ical_uid.as_deref() != Some(&exclude_uid))
+        .filter(|e| e.start.as_ref().and_then(|s| s.date_time.as_ref()).is_some()) // exclude all-day
+        .filter(|e| e.status.as_deref() != Some("cancelled"))
+        .filter(|e| {
+            e.attendees.as_ref().and_then(|atts| atts.iter().find(|a| a.is_self))
+                .map(|a| a.response_status.as_deref() != Some("declined"))
+                .unwrap_or(true)
+        })
         .filter_map(|e| e.summary)
         .collect();
     Ok(conflicts)
