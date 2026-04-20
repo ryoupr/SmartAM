@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { MailSummary } from '$lib/types';
+  import { formatMailDate } from '$lib/store';
 
-  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200 }: {
+  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
     mails: MailSummary[];
     selectedUid: number | null;
     onSelect: (uid: number) => void;
@@ -11,6 +12,8 @@
     loadingMore?: boolean;
     searchQuery?: string;
     pageSize?: number;
+    dateFormat?: string;
+    timezone?: string;
   } = $props();
 
   function handleScroll(e: Event) {
@@ -39,7 +42,7 @@
       <button class="mail-item" class:selected={selectedUid === mail.uid} class:unread={!mail.seen} onclick={() => onSelect(mail.uid)}>
         <div class="mail-header">
           <span class="from">{mail.from}</span>
-          <span class="date">{mail.date}</span>
+          <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
         </div>
         <div class="subject">{mail.subject}</div>
       </button>

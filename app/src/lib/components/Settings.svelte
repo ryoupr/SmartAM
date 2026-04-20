@@ -74,6 +74,7 @@
     { id: 'llm', label: 'LLMプロバイダー' },
     { id: 'ai_usage', label: 'AI 利用状況' },
     { id: 'shortcuts', label: 'キーボードショートカット' },
+    { id: 'display', label: '表示設定' },
   ];
   const perAccountTabs = [
     { suffix: 'signature', label: '署名' },
@@ -412,6 +413,25 @@
             {/each}
           {/each}
           {#if scConflict}<div class="sc-conflict">⚠ {scConflict}</div>{/if}
+
+        {:else if activeTab === 'display'}
+          <h3>表示設定</h3>
+          <label class="fl">日時形式
+            <select bind:value={local.dateFormat}>
+              <option value="YYYY/MM/DD HH:mm:ss">YYYY/MM/DD HH:mm:ss</option>
+              <option value="YYYY-MM-DD HH:mm:ss">YYYY-MM-DD HH:mm:ss</option>
+              <option value="YYYY/MM/DD HH:mm">YYYY/MM/DD HH:mm</option>
+              <option value="MM/DD HH:mm">MM/DD HH:mm</option>
+              <option value="DD/MM/YYYY HH:mm:ss">DD/MM/YYYY HH:mm:ss</option>
+            </select>
+          </label>
+          <label class="fl">タイムゾーン
+            <select bind:value={local.timezone}>
+              {#each ['Asia/Tokyo','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Europe/Berlin','Asia/Shanghai','Asia/Singapore','Australia/Sydney','Pacific/Auckland','UTC'] as tz}
+                <option value={tz}>{tz}</option>
+              {/each}
+            </select>
+          </label>
 
         {/if}
       </div>
