@@ -45,6 +45,7 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   reply: 'r', forward: 'f', archive: 'a', delete: '#', star: 's', undo: 'z',
   aiSummary: 'y', aiDraft: 'd', aiTranslate: 't', aiCalendar: 'l',
   compose: 'c', search: '/', help: '?',
+  acceptInvite: 'A', declineInvite: 'D',
   goInbox: 'g i', goStarred: 'g s', goSent: 'g t', goDrafts: 'g d', goAll: 'g a',
 };
 
@@ -166,6 +167,12 @@ export function formatMailDate(raw: string, format: string, tz: string): string 
     }).formatToParts(d);
     const p = (type: string) => parts.find(p => p.type === type)?.value ?? '';
     const Y = p('year'), M = p('month'), D = p('day'), H = p('hour'), m = p('minute'), s = p('second');
+    // Today → show time only
+    const nowParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const np = (type: string) => nowParts.find(p => p.type === type)?.value ?? '';
+    if (Y === np('year') && M === np('month') && D === np('day')) return `${H}:${m}`;
     return format
       .replace('YYYY', Y).replace('MM', M).replace('DD', D)
       .replace('HH', H).replace('mm', m).replace('ss', s);

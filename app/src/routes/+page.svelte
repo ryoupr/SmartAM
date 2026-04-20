@@ -457,6 +457,8 @@
       case 'aiDraft': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="返信下書き"]')?.click(); break;
       case 'aiTranslate': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="翻訳"]')?.click(); break;
       case 'aiCalendar': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="カレンダー登録"]')?.click(); break;
+      case 'acceptInvite': document.querySelector<HTMLButtonElement>('.btn-accept:not(:disabled)')?.click(); break;
+      case 'declineInvite': document.querySelector<HTMLButtonElement>('.btn-decline:not(:disabled)')?.click(); break;
     }
   }
 </script>
