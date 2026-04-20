@@ -476,7 +476,7 @@
     {syncing}
     {syncStatus}
   />
-  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={pageSize()} />
+  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={pageSize()} dateFormat={settings.dateFormat} timezone={settings.timezone} />
   <MailDetail
     mail={selectedMail}
     onArchive={handleArchive}

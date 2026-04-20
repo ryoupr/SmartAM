@@ -55,6 +55,8 @@ export interface AppSettings {
   mailsPerPage: number;
   aiBudgetLimitUsd: number;
   shortcuts: ShortcutMap;
+  dateFormat: string;
+  timezone: string;
 }
 
 export const DEFAULT_ACCOUNT_EXTRAS = {
@@ -79,6 +81,8 @@ export const DEFAULTS: AppSettings = {
   mailsPerPage: 200,
   aiBudgetLimitUsd: 0,
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  dateFormat: 'YYYY/MM/DD HH:mm:ss',
+  timezone: 'Asia/Tokyo',
 };
 
 let _store: Awaited<ReturnType<typeof load>> | null = null;
@@ -150,4 +154,20 @@ export function getLlmConfig(llm: LlmSettings): { base_url: string; model: strin
       return { base_url: 'http://localhost:4000', model: `bedrock/${llm.bedrock.model}`, api_key: '' };
     case 'gemini': return { base_url: 'http://localhost:4000', model: `gemini/${llm.gemini.model}`, api_key: '' };
   }
+}
+
+export function formatMailDate(raw: string, format: string, tz: string): string {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(d);
+    const p = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+    const Y = p('year'), M = p('month'), D = p('day'), H = p('hour'), m = p('minute'), s = p('second');
+    return format
+      .replace('YYYY', Y).replace('MM', M).replace('DD', D)
+      .replace('HH', H).replace('mm', m).replace('ss', s);
+  } catch { return raw; }
 }
