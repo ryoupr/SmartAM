@@ -39,6 +39,7 @@ export interface FolderInfo {
 }
 
 export interface CalendarEvent {
+  uid: string;
   summary: string;
   dtstart: string;
   dtend: string;

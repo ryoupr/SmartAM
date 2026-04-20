@@ -492,6 +492,7 @@
       return invoke<string>('fetch_attachment_data', { config: getImapConfig(a), folder: activeFolder, uid: selectedUid, partIndex });
     }}
     llmConfig={llm()}
+    smtpConfig={acc() ? getSmtpConfig(acc()!) : null}
     calendarName={acc()?.calendar?.calendarName ?? '仕事'}
     {calendarNames}
   />

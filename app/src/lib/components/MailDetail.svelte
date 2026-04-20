@@ -6,7 +6,7 @@
   import EventCard from './EventCard.svelte';
   import type { MailDetail, Attachment, CalendarEvent } from '$lib/types';
 
-  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, calendarName = '仕事', calendarNames = [] }: {
+  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [] }: {
     mail: MailDetail | null;
     onArchive: () => void;
     onDelete: () => void;
@@ -17,6 +17,7 @@
     onDownloadAttachment: (partIndex: number, filename: string) => void;
     onFetchAttachmentData: (partIndex: number) => Promise<string>;
     llmConfig: { base_url: string; model: string; api_key: string };
+    smtpConfig?: { email: string; auth_type: string; password: string; access_token: string; smtp_host: string; smtp_port: number } | null;
     calendarName?: string;
     calendarNames?: string[];
   } = $props();
@@ -174,9 +175,20 @@
 
     {#if icsEvent}
       <EventCard event={icsEvent}
-        onAccept={() => {}}
-        onDecline={() => {}}
-        onAddToCalendar={() => { if (!openPanels.has('calendar')) togglePanel('calendar'); }}
+        onAccept={async () => {
+          if (smtpConfig?.auth_type === 'oauth') {
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: true });
+          } else {
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true });
+          }
+        }}
+        onDecline={async () => {
+          if (smtpConfig?.auth_type === 'oauth') {
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: false });
+          } else {
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false });
+          }
+        }}
       />
     {/if}
 

@@ -88,3 +88,31 @@ pub async fn send_mail_with_attachments(
     mailer.send(email).await.map_err(|e| format!("送信失敗: {e}"))?;
     Ok("送信成功".into())
 }
+
+pub async fn send_calendar_response(
+    config: &SmtpConfig,
+    to: &str,
+    subject: &str,
+    ics_body: &str,
+) -> Result<String, String> {
+    use lettre::message::{MultiPart, SinglePart, header::ContentType as CT};
+
+    let from: Mailbox = config.email.parse().map_err(|e| format!("{e}"))?;
+    let to_mb: Mailbox = to.parse().map_err(|e| format!("{e}"))?;
+
+    let ct = CT::parse("text/calendar; method=REPLY; charset=UTF-8").map_err(|e| format!("{e}"))?;
+    let email = MessageBuilder::new()
+        .from(from)
+        .to(to_mb)
+        .subject(subject)
+        .multipart(
+            MultiPart::mixed().singlepart(
+                SinglePart::builder().header(ct).body(ics_body.to_string())
+            )
+        )
+        .map_err(|e| format!("{e}"))?;
+
+    let mailer = build_mailer(config)?;
+    mailer.send(email).await.map_err(|e| format!("送信失敗: {e}"))?;
+    Ok("送信成功".into())
+}

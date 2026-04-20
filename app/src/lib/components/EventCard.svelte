@@ -1,12 +1,24 @@
 <script lang="ts">
   import type { CalendarEvent } from '$lib/types';
 
-  let { event, onAccept, onDecline, onAddToCalendar }: {
+  let { event, onAccept, onDecline }: {
     event: CalendarEvent;
-    onAccept: () => void;
-    onDecline: () => void;
-    onAddToCalendar: () => void;
+    onAccept: () => Promise<void>;
+    onDecline: () => Promise<void>;
   } = $props();
+
+  let responding = $state(false);
+  let toast = $state('');
+
+  async function handleResponse(action: () => Promise<void>, label: string) {
+    responding = true;
+    toast = '';
+    try {
+      await action();
+      toast = `✅ ${label}しました`;
+    } catch (e) { toast = `❌ ${e}`; }
+    finally { responding = false; }
+  }
 
   function formatDt(raw: string): string {
     if (!raw) return '';
@@ -50,10 +62,10 @@
   {#if event.attendees.length > 0}<div class="ev-row">👥 参加者: {attendeeSummary}</div>{/if}
   {#if event.description}<div class="ev-desc">{event.description}</div>{/if}
   <div class="ev-actions">
-    <button class="btn-accept" onclick={onAccept}>✅ 承諾</button>
-    <button class="btn-decline" onclick={onDecline}>✕ 辞退</button>
-    <button class="btn-cal" onclick={onAddToCalendar}>📅 カレンダーに登録</button>
+    <button class="btn-accept" disabled={responding} onclick={() => handleResponse(onAccept, '承諾')}>承諾</button>
+    <button class="btn-decline" disabled={responding} onclick={() => handleResponse(onDecline, '辞退')}>辞退</button>
   </div>
+  {#if toast}<div class="ev-toast">{toast}</div>{/if}
 </div>
 
 <style>
@@ -70,5 +82,6 @@
   .ev-actions button { padding:4px 12px;border-radius:6px;border:none;font-size:10px;font-weight:700;cursor:pointer;color:var(--base) }
   .btn-accept { background:var(--green) }
   .btn-decline { background:var(--red) }
-  .btn-cal { background:var(--blue) }
+  .ev-actions button:disabled { opacity:.6;cursor:default }
+  .ev-toast { font-size:10px;margin-top:6px;padding:4px 8px;border-radius:4px;background:var(--surface0) }
 </style>

@@ -306,6 +306,68 @@ fn parse_ics_attachment(data: String) -> Result<Vec<ics_parser::CalendarEvent>, 
     ics_parser::parse_ics(&bytes)
 }
 
+#[tauri::command]
+async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEvent, accept: bool) -> Result<String, String> {
+    let action = if accept { "ACCEPTED" } else { "DECLINED" };
+    trace::trace("CMD", &format!("respond_calendar_invite: {} {}", event.summary, action));
+    let ics = ics_parser::generate_reply_ics(&event, &smtp.email, accept);
+    let subject = format!("{}: {}", if accept { "承諾" } else { "辞退" }, event.summary);
+    smtp_client::send_calendar_response(&smtp, &event.organizer, &subject, &ics).await
+}
+
+#[tauri::command]
+async fn respond_google_calendar_invite(access_token: String, ics_uid: String, my_email: String, accept: bool) -> Result<String, String> {
+    let status = if accept { "accepted" } else { "declined" };
+    trace::trace("CMD", &format!("respond_google_calendar_invite: {} {}", ics_uid, status));
+    let client = reqwest::Client::new();
+
+    // 1. iCalUID でイベントを検索
+    let url = format!(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events?iCalUID={}",
+        ics_uid
+    );
+    let resp = client.get(&url).bearer_auth(&access_token)
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !resp.status().is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("イベント検索失敗: {body}"));
+    }
+
+    #[derive(serde::Deserialize)]
+    struct EventList { items: Vec<GEvent> }
+    #[derive(serde::Deserialize, Clone)]
+    struct GEvent { id: String, attendees: Option<Vec<Attendee>> }
+    #[derive(serde::Deserialize, serde::Serialize, Clone)]
+    struct Attendee { email: String, #[serde(rename = "responseStatus")] response_status: String, #[serde(rename = "self", default)] is_self: bool }
+
+    let list: EventList = resp.json().await.map_err(|e| format!("{e}"))?;
+    let ev = list.items.first().ok_or("カレンダーにイベントが見つかりません")?;
+
+    // 2. attendees の自分の responseStatus を更新
+    let mut attendees = ev.attendees.clone().unwrap_or_default();
+    let my_lower = my_email.to_lowercase();
+    let found = attendees.iter_mut().find(|a| a.email.to_lowercase() == my_lower || a.is_self);
+    match found {
+        Some(a) => a.response_status = status.to_string(),
+        None => attendees.push(Attendee { email: my_email, response_status: status.to_string(), is_self: true }),
+    }
+
+    // 3. PATCH で更新
+    let patch_url = format!(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events/{}",
+        ev.id
+    );
+    let patch_resp = client.patch(&patch_url).bearer_auth(&access_token)
+        .json(&serde_json::json!({ "attendees": attendees }))
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !patch_resp.status().is_success() {
+        let body = patch_resp.text().await.unwrap_or_default();
+        return Err(format!("応答更新失敗: {body}"));
+    }
+
+    Ok(if accept { "承諾しました".into() } else { "辞退しました".into() })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     trace::init();
@@ -344,6 +406,8 @@ pub fn run() {
             detect_calendar_events, register_calendar_event,
             open_external_url,
             parse_ics_attachment,
+            respond_calendar_invite,
+            respond_google_calendar_invite,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
