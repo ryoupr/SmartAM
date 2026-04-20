@@ -92,6 +92,32 @@ Settings stored via Tauri store plugin → `settings.json`. No local database; m
 ## Security
 
 - **No secrets in source code.** OAuth credentials are loaded from environment variables at runtime.
+
+## Git Workflow
+
+- デフォルト branch: `main`（リリース用）、`develop`（開発用）
+- feature branch は必ず `develop` から切る
+- PR のターゲットは `develop`
+- リリース時のみ `develop` → `main` にマージし、タグを打つ
+
+```
+develop → feature/xxx → PR → develop → (リリース時) → main + tag
+```
+
+### 手順
+
+1. `git checkout develop && git pull origin develop`
+2. `git checkout -b feature/xxx`
+3. 実装・検証（`cargo check` + `npm run check`）
+4. commit → push → PR（base: `develop`）→ マージ
+5. リリース時: `develop` → `main` にマージ、バージョンバンプ、タグ作成
+
+### バージョン管理
+
+バージョンは以下の3ファイルを同時に更新する:
+- `app/package.json`
+- `app/src-tauri/Cargo.toml`
+- `app/src-tauri/tauri.conf.json`
 - API keys (LLM providers, etc.) are stored in Tauri's `settings.json` on the user's local machine, not in the repository.
 - `.env` files are gitignored. Use `.env.example` as a template.
 
