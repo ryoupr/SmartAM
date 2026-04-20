@@ -175,8 +175,20 @@
 
     {#if icsEvent}
       <EventCard event={icsEvent}
-        onAccept={async () => { await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true }); }}
-        onDecline={async () => { await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false }); }}
+        onAccept={async () => {
+          if (smtpConfig?.auth_type === 'oauth') {
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: true });
+          } else {
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: true });
+          }
+        }}
+        onDecline={async () => {
+          if (smtpConfig?.auth_type === 'oauth') {
+            await invoke('respond_google_calendar_invite', { accessToken: smtpConfig.access_token, icsUid: icsEvent!.uid, myEmail: smtpConfig.email, accept: false });
+          } else {
+            await invoke('respond_calendar_invite', { smtp: smtpConfig, event: icsEvent, accept: false });
+          }
+        }}
       />
     {/if}
 
