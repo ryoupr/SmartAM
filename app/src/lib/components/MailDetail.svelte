@@ -228,7 +228,7 @@
       {/if}
     {:else if mail.body_html}
       <div class="body body-html">{@html sanitizeHtml(mail.body_html)}</div>
-    {:else}
+    {:else if mail.body_text.trim()}
       <div class="body">{mail.body_text}</div>
     {/if}
   {:else}
