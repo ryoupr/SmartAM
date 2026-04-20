@@ -316,6 +316,31 @@ async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEv
 }
 
 #[tauri::command]
+async fn check_calendar_conflicts(access_token: String, time_min: String, time_max: String, exclude_uid: String) -> Result<Vec<String>, String> {
+    trace::trace("CMD", &format!("check_calendar_conflicts: {} ~ {}", time_min, time_max));
+    let client = reqwest::Client::new();
+    let url = format!(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin={}&timeMax={}&singleEvents=true&orderBy=startTime",
+        time_min, time_max
+    );
+    let resp = client.get(&url).bearer_auth(&access_token)
+        .send().await.map_err(|e| format!("{e}"))?;
+    if !resp.status().is_success() { return Ok(vec![]); }
+
+    #[derive(serde::Deserialize)]
+    struct EventList { items: Option<Vec<GEvent>> }
+    #[derive(serde::Deserialize)]
+    struct GEvent { summary: Option<String>, #[serde(rename = "iCalUID")] ical_uid: Option<String> }
+
+    let list: EventList = resp.json().await.map_err(|e| format!("{e}"))?;
+    let conflicts: Vec<String> = list.items.unwrap_or_default().into_iter()
+        .filter(|e| e.ical_uid.as_deref() != Some(&exclude_uid))
+        .filter_map(|e| e.summary)
+        .collect();
+    Ok(conflicts)
+}
+
+#[tauri::command]
 async fn get_calendar_event_status(access_token: String, ics_uid: String, my_email: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let url = format!(
@@ -437,6 +462,7 @@ pub fn run() {
             respond_calendar_invite,
             respond_google_calendar_invite,
             get_calendar_event_status,
+            check_calendar_conflicts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
