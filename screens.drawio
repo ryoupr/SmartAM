@@ -1952,7 +1952,7 @@
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
                 <mxCell id="win" value="SmartAM - invite.ics イベント表示" style="swimlane;startSize=30;fillColor=#1e1e2e;swimlaneFillColor=#1e1e2e;fontColor=#cdd6f4;strokeColor=#45475a;fontSize=13;fontStyle=1;" parent="1" vertex="1">
-                    <mxGeometry x="20" y="20" width="560" height="760" as="geometry"/>
+                    <mxGeometry x="20" y="20" width="560" height="830" as="geometry"/>
                 </mxCell>
                 <mxCell id="subj" value="&lt;b&gt;Meeting: Q2 Planning Review&lt;/b&gt;" style="text;html=1;fontSize=14;fontColor=#cdd6f4;align=left;" parent="win" vertex="1">
                     <mxGeometry x="10" y="38" width="480" height="24" as="geometry"/>
@@ -1970,7 +1970,7 @@
                     <mxGeometry x="10" y="134" width="140" height="26" as="geometry"/>
                 </mxCell>
                 <mxCell id="ev_card" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e1e2e;strokeColor=#89b4fa;strokeWidth=2;" parent="win" vertex="1">
-                    <mxGeometry x="10" y="170" width="540" height="240" as="geometry"/>
+                    <mxGeometry x="10" y="170" width="540" height="310" as="geometry"/>
                 </mxCell>
                 <mxCell id="ev_icon" value="📅" style="text;html=1;fontSize=20;align=left;" parent="win" vertex="1">
                     <mxGeometry x="20" y="178" width="30" height="30" as="geometry"/>
@@ -1999,20 +1999,29 @@
                 <mxCell id="ev_att" value="👥 参加者: bob@example.com, carol@example.com 他2名" style="text;html=1;fontSize=11;fontColor=#a6adc8;align=left;" parent="win" vertex="1">
                     <mxGeometry x="20" y="320" width="420" height="20" as="geometry"/>
                 </mxCell>
+                <mxCell id="ev_desc" value="Q1の振り返りとQ2のOKRレビュー、リソース配分について議論します。" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#313244;strokeColor=none;fontColor=#a6adc8;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;spacingRight=8;" parent="win" vertex="1">
+                    <mxGeometry x="20" y="346" width="520" height="40" as="geometry"/>
+                </mxCell>
                 <mxCell id="btn_accept" value="✅ 承諾" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#a6e3a1;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
-                    <mxGeometry x="20" y="350" width="80" height="26" as="geometry"/>
+                    <mxGeometry x="20" y="396" width="80" height="26" as="geometry"/>
                 </mxCell>
                 <mxCell id="btn_decline" value="✕ 辞退" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f38ba8;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
-                    <mxGeometry x="108" y="350" width="80" height="26" as="geometry"/>
+                    <mxGeometry x="108" y="396" width="80" height="26" as="geometry"/>
                 </mxCell>
                 <mxCell id="btn_cal" value="📅 カレンダーに登録" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#89b4fa;strokeColor=none;fontColor=#1e1e2e;fontStyle=1;" parent="win" vertex="1">
-                    <mxGeometry x="196" y="350" width="120" height="26" as="geometry"/>
+                    <mxGeometry x="196" y="396" width="120" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="ev_toast" value="✅ 承諾しました" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#313244;strokeColor=none;fontColor=#a6e3a1;" parent="win" vertex="1">
+                    <mxGeometry x="20" y="430" width="120" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="note_toast" value="※ 承諾/辞退送信後に表示。ボタンは送信中 disabled" style="text;html=1;fontSize=9;fontColor=#6c7086;fontStyle=2;align=left;" parent="win" vertex="1">
+                    <mxGeometry x="150" y="432" width="340" height="16" as="geometry"/>
                 </mxCell>
                 <mxCell id="body" value="Hi Bob,&lt;br&gt;&lt;br&gt;Please find the meeting invite for our Q2 planning review.&lt;br&gt;We&#39;ll cover roadmap priorities and resource allocation.&lt;br&gt;&lt;br&gt;Agenda:&lt;br&gt;1. Q1 retrospective (15 min)&lt;br&gt;2. Q2 OKR review (20 min)&lt;br&gt;3. Resource planning (25 min)&lt;br&gt;&lt;br&gt;Best regards,&lt;br&gt;Alice" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#e6e9ef;fontColor=#1a1a1a;align=left;verticalAlign=top;spacingLeft=12;spacingTop=10;spacingRight=12;" parent="win" vertex="1">
-                    <mxGeometry x="10" y="430" width="540" height="240" as="geometry"/>
+                    <mxGeometry x="10" y="500" width="540" height="220" as="geometry"/>
                 </mxCell>
                 <mxCell id="note_body" value="※ 本文がない場合はこのエリアは非表示" style="text;html=1;fontSize=9;fontColor=#6c7086;fontStyle=2;align=left;" parent="win" vertex="1">
-                    <mxGeometry x="10" y="676" width="280" height="16" as="geometry"/>
+                    <mxGeometry x="10" y="726" width="280" height="16" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
