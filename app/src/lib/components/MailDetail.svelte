@@ -32,6 +32,8 @@
   let translating = $state(false);
   let icsEvents: CalendarEvent[] = $state([]);
   let conflictsMap: Record<string, string[]> = $state({});
+  let htmlBodyEl: HTMLDivElement | undefined = $state(undefined);
+  let htmlScale = $state(1);
 
   // Reset panels when mail changes
   $effect(() => {
@@ -77,6 +79,19 @@
         }).catch(() => {});
       }
     }
+  });
+
+  $effect(() => {
+    if (!htmlBodyEl) return;
+    const ro = new ResizeObserver(() => {
+      const container = htmlBodyEl!.parentElement;
+      if (!container) return;
+      const cw = container.clientWidth - 32;
+      const sw = htmlBodyEl!.scrollWidth;
+      htmlScale = sw > cw ? cw / sw : 1;
+    });
+    ro.observe(htmlBodyEl);
+    return () => ro.disconnect();
   });
 
   function sanitizeHtml(html: string): string {
@@ -225,12 +240,16 @@
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <div class="body body-html translated">{@html sanitizeHtml(translatedBody)}</div>
+        <div class="body body-html translated" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
+          <div bind:this={htmlBodyEl}>{@html sanitizeHtml(translatedBody)}</div>
+        </div>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <div class="body body-html">{@html sanitizeHtml(mail.body_html)}</div>
+      <div class="body body-html" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
+        <div bind:this={htmlBodyEl}>{@html sanitizeHtml(mail.body_html)}</div>
+      </div>
     {:else if mail.body_text.trim()}
       <div class="body">{mail.body_text}</div>
     {/if}
