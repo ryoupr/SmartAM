@@ -397,7 +397,7 @@
                 <span class="sc-label">{item[1]}</span>
                 <button
                   class="sc-key" class:recording={recordingAction === item[0]}
-                  onclick={() => { recordingAction = item[0]; scConflict = ''; }}
+                  onclick={(e) => { recordingAction = item[0]; scConflict = ''; e.currentTarget.focus(); }}
                   onkeydown={(e) => {
                     if (recordingAction !== item[0]) return;
                     e.preventDefault(); e.stopPropagation();
