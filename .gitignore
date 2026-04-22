@@ -14,8 +14,20 @@ Thumbs.db
 .env.*
 !.env.example
 
+# Signing keys
+*.pem
+*.pem.pub
+
 # Logs
 *.log
 /var/log/smartam/
+
+# Build artifacts
+app/src-tauri/target/
+app/build/
+app/.svelte-kit/
+app/node_modules/
+
+# Misc
 .git-old/
 SmartAM-0.1.0-source.zip
