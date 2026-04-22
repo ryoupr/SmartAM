@@ -46,9 +46,15 @@ end tell"#,
     );
 
     let output = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            child.stdin.take().unwrap().write_all(script.as_bytes())?;
+            child.wait_with_output()
+        })
         .map_err(|e| format!("osascript実行失敗: {e}"))?;
 
     if output.status.success() {
