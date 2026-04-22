@@ -163,8 +163,19 @@
         if (acc()?.notifications) {
           try {
             const { sendNotification } = await import('@tauri-apps/plugin-notification');
-            sendNotification({ title: 'SmartAM', body: `${newMails.length}件の新着メール` });
-          } catch {}
+            const latest = newMails[0];
+            const body = newMails.length === 1
+              ? `${latest.from}: ${latest.subject}`
+              : `${latest.from}: ${latest.subject} 他${newMails.length - 1}件`;
+            const opts: Parameters<typeof sendNotification>[0] = { title: 'SmartAM', body };
+            if (!acc()?.notificationSound) opts.silent = true;
+            sendNotification(opts);
+            if (acc()?.notificationBadge) {
+              const { getCurrentWindow } = await import('@tauri-apps/api/window');
+              const unread = mails.filter(m => !m.seen).length;
+              await getCurrentWindow().setBadgeCount(unread || undefined);
+            }
+          } catch (e) { trace('NOTIFY', `sendNotification error: ${e}`); }
         }
       }
     } catch (e) { trace('POLL', `fetch_new_mails error: ${e}`); }
