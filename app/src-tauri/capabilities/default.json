@@ -10,6 +10,7 @@
     "store:default",
     "log:default",
     "notification:default",
-    "dialog:default"
+    "dialog:default",
+    "updater:default"
   ]
 }

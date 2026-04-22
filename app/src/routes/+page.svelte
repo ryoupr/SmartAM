@@ -8,6 +8,8 @@
   import ComposeModal from '$lib/components/ComposeModal.svelte';
   import type { MailSummary, MailDetail as MailDetailType } from '$lib/types';
   import { loadSettings, saveSettings, getImapConfig, getSmtpConfig, getLlmConfig, type AppSettings, type ShortcutMap, DEFAULTS } from '$lib/store';
+  import { check } from '@tauri-apps/plugin-updater';
+  import { relaunch } from '@tauri-apps/plugin-process';
 
   function trace(tag: string, msg: string) {
     console.log(`[${tag}] ${msg}`);
@@ -37,6 +39,7 @@
   let hasMore = $state(true);
   function pageSize() { return settings.mailsPerPage ?? 200; }
   let calendarNames: string[] = $state([]);
+  let updateAvailable: { version: string; doUpdate: () => Promise<void> } | null = $state(null);
 
   let searchResults: MailSummary[] | null = $state(null);
   let searching = $state(false);
@@ -98,6 +101,21 @@
       trace('MOUNT', 'notification ok');
     } catch (e) { trace('MOUNT', `notification skip: ${e}`); }
     trace('MOUNT', 'done');
+
+    // Check for updates
+    try {
+      const update = await check();
+      if (update) {
+        trace('UPDATE', `new version available: ${update.version}`);
+        updateAvailable = {
+          version: update.version,
+          doUpdate: async () => {
+            await update.downloadAndInstall();
+            await relaunch();
+          }
+        };
+      }
+    } catch (e) { trace('UPDATE', `check failed: ${e}`); }
 
     // Intercept link clicks in mail body → open in system browser
     document.addEventListener('click', handleLinkClick);
@@ -531,6 +549,10 @@
   <Settings {settings} onClose={() => showSettings = false} onSave={async (s) => { try { const plain = JSON.parse(JSON.stringify(s)); await saveSettings(plain); settings = plain; invoke('set_ai_budget', { limitUsd: plain.aiBudgetLimitUsd ?? 0 }).catch(() => {}); showSettings = false; startPolling(); await fetchMails(); } catch (e) { error = '設定の保存に失敗: ' + String(e); } }} />
 {/if}
 
+{#if updateAvailable}
+  <div class="update-bar">🚀 v{updateAvailable.version} が利用可能です <button class="update-btn" onclick={updateAvailable.doUpdate}>アップデート</button><button class="update-dismiss" onclick={() => updateAvailable = null}>✕</button></div>
+{/if}
+
 {#if toast}
   <div class="toast-bar">{toast.msg}{#if toast.undo}<button class="undo" onclick={() => { toast?.undo?.(); toast = null; }}>元に戻す</button>{/if}</div>
 {/if}
@@ -549,4 +571,7 @@
   .undo { background:none;border:none;color:var(--blue);cursor:pointer;font-size:11px;text-decoration:underline }
   .toast-err { position:fixed;bottom:56px;right:16px;padding:10px 16px;background:#3a1e1e;color:var(--red);border:1px solid var(--red);border-radius:8px;font-size:12px;z-index:100 }
   .toast-err button { background:none;border:none;color:var(--red);cursor:pointer;margin-left:8px }
+  .update-bar { position:fixed;top:0;left:0;right:0;padding:8px 16px;background:var(--mauve);color:var(--base);font-size:12px;font-weight:700;text-align:center;z-index:200;display:flex;align-items:center;justify-content:center;gap:12px }
+  .update-btn { padding:4px 12px;border-radius:4px;border:none;background:var(--base);color:var(--mauve);font-weight:700;font-size:11px;cursor:pointer }
+  .update-dismiss { background:none;border:none;color:var(--base);cursor:pointer;font-size:14px;opacity:.7 }
 </style>
