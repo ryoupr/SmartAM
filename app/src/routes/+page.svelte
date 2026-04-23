@@ -110,8 +110,15 @@
         updateAvailable = {
           version: update.version,
           doUpdate: async () => {
-            await update.downloadAndInstall();
-            await relaunch();
+            try {
+              trace('UPDATE', 'downloading...');
+              await update.downloadAndInstall();
+              trace('UPDATE', 'installed, relaunching...');
+              await relaunch();
+            } catch (e) {
+              trace('UPDATE', `install failed: ${e}`);
+              error = `アップデート失敗: ${e}`;
+            }
           }
         };
       }
