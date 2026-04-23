@@ -26,9 +26,25 @@
 
   type UsageSummary = { month: string; models: { model: string; input_tokens: number; output_tokens: number; cost_usd: number; requests: number }[]; total_cost_usd: number; budget_limit_usd: number; budget_remaining_usd: number };
   let aiUsage: UsageSummary | null = $state(null);
+  let usageMonths: string[] = $state([]);
+  let selectedMonth = $state('');
 
   async function fetchAiUsage() {
-    try { aiUsage = await invoke<UsageSummary>('get_ai_usage'); } catch { aiUsage = null; }
+    try {
+      const months = await invoke<string[]>('get_ai_usage_months');
+      usageMonths = months;
+      if (!selectedMonth) selectedMonth = months[0] ?? '';
+      if (selectedMonth) {
+        aiUsage = await invoke<UsageSummary>('get_ai_usage_for_month', { month: selectedMonth });
+      } else {
+        aiUsage = await invoke<UsageSummary>('get_ai_usage');
+      }
+    } catch { aiUsage = null; }
+  }
+
+  async function onMonthChange() {
+    if (!selectedMonth) return;
+    try { aiUsage = await invoke<UsageSummary>('get_ai_usage_for_month', { month: selectedMonth }); } catch { aiUsage = null; }
   }
 
   async function fetchGoogleCalendars() {
@@ -76,6 +92,7 @@
     { id: 'ai_usage', label: 'AI 利用状況' },
     { id: 'shortcuts', label: 'キーボードショートカット' },
     { id: 'display', label: '表示設定' },
+    { id: 'about', label: 'SmartAM' },
   ];
   const perAccountTabs = [
     { suffix: 'signature', label: '署名' },
@@ -296,24 +313,44 @@
             <input type="number" step="0.5" min="0" bind:value={local.aiBudgetLimitUsd} placeholder="0 = 無制限" />
           </label>
           <div class="cm" style="margin-bottom:12px">{local.aiBudgetLimitUsd > 0 ? `$${local.aiBudgetLimitUsd} を超えるとAI機能が停止します` : '上限なし（無制限）'}</div>
-          <button class="btn-sm gb" onclick={fetchAiUsage} style="margin-bottom:12px">利用状況を更新</button>
+          <div class="row" style="margin-bottom:12px;align-items:center">
+            <button class="btn-sm gb" onclick={fetchAiUsage}>利用状況を更新</button>
+            {#if usageMonths.length > 0}
+              <select class="month-sel" bind:value={selectedMonth} onchange={onMonthChange}>
+                {#each usageMonths as m}<option value={m}>{m}</option>{/each}
+              </select>
+            {/if}
+          </div>
           {#if aiUsage}
             <div class="card">
               <div class="ch">📊 {aiUsage.month}</div>
+              {#if aiUsage.budget_limit_usd > 0}
+                {@const pct = Math.min(100, (aiUsage.total_cost_usd / aiUsage.budget_limit_usd) * 100)}
+                <div class="budget-bar-wrap">
+                  <div class="budget-bar" style="width:{pct}%;background:{pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--yellow)' : 'var(--green)'}"></div>
+                </div>
+                <div class="cm">${aiUsage.total_cost_usd.toFixed(4)} / ${aiUsage.budget_limit_usd.toFixed(2)} ({pct.toFixed(1)}%)</div>
+              {/if}
               {#if aiUsage.models.length === 0}
                 <div class="cm">利用データなし</div>
               {:else}
+                {@const maxCost = Math.max(...aiUsage.models.map(m => m.cost_usd), 0.0001)}
                 {#each aiUsage.models as m}
                   <div class="usage-row">
-                    <span class="usage-model">{m.model}</span>
-                    <span class="usage-detail">入力: {m.input_tokens.toLocaleString()} tokens / 出力: {m.output_tokens.toLocaleString()} tokens / {m.requests}回</span>
-                    <span class="usage-cost">${m.cost_usd.toFixed(4)}</span>
+                    <div class="usage-model">{m.model}</div>
+                    <div class="usage-bar-wrap">
+                      <div class="usage-bar" style="width:{(m.cost_usd / maxCost * 100).toFixed(1)}%"></div>
+                    </div>
+                    <div class="usage-stats">
+                      <span>${m.cost_usd.toFixed(4)}</span>
+                      <span class="usage-detail">{m.requests}回 · 入力 {m.input_tokens.toLocaleString()} · 出力 {m.output_tokens.toLocaleString()}</span>
+                    </div>
                   </div>
                 {/each}
                 <div class="usage-total">
                   合計: <strong>${aiUsage.total_cost_usd.toFixed(4)}</strong>
                   {#if aiUsage.budget_limit_usd > 0}
-                    / ${aiUsage.budget_limit_usd.toFixed(2)} （残り: ${aiUsage.budget_remaining_usd.toFixed(4)}）
+                    （残り: ${aiUsage.budget_remaining_usd.toFixed(4)}）
                   {/if}
                 </div>
                 {#if aiUsage.budget_limit_usd > 0 && aiUsage.budget_remaining_usd <= 0}
@@ -434,6 +471,25 @@
             </select>
           </label>
 
+        {:else if activeTab === 'about'}
+          <h3>SmartAM</h3>
+          <div class="about-card">
+            <div class="about-logo">✉</div>
+            <div class="about-name">SmartAM</div>
+            <div class="about-desc">AI-native Desktop Mail Client</div>
+            <div class="about-ver">v0.1.10</div>
+            <div class="about-info">
+              <div>Platform: macOS (Tauri v2)</div>
+              <div>Frontend: SvelteKit + TypeScript</div>
+              <div>Backend: Rust</div>
+            </div>
+            <div class="about-links">
+              <button class="btn-sm" onclick={() => invoke('open_external_url', { url: 'https://github.com/ryoupr/SmartAM' })}>GitHub</button>
+              <button class="btn-sm" onclick={() => invoke('open_external_url', { url: 'https://github.com/ryoupr/SmartAM/releases' })}>Releases</button>
+            </div>
+            <div class="about-copy">© 2026 SmartAM · MIT License</div>
+          </div>
+
         {/if}
       </div>
     </div>
@@ -493,6 +549,21 @@
   .usage-cost { color:var(--green);font-size:11px;font-weight:700 }
   .usage-total { padding:8px 0;font-size:11px;color:var(--text) }
   .usage-warn { padding:6px 10px;border-radius:4px;background:#3a1e1e;color:var(--red);font-size:10px;font-weight:700;margin-top:4px }
+  .usage-bar-wrap { height:6px;background:var(--surface0);border-radius:3px;overflow:hidden;margin:2px 0 }
+  .usage-bar { height:100%;background:var(--mauve);border-radius:3px;transition:width .3s }
+  .usage-stats { display:flex;justify-content:space-between;align-items:center }
+  .usage-stats span:first-child { color:var(--green);font-weight:700;font-size:11px }
+  .budget-bar-wrap { height:8px;background:var(--surface0);border-radius:4px;overflow:hidden;margin:6px 0 4px }
+  .budget-bar { height:100%;border-radius:4px;transition:width .3s }
+  .month-sel { padding:4px 8px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px }
+  .about-card { text-align:center;padding:24px 16px }
+  .about-logo { font-size:48px;margin-bottom:8px }
+  .about-name { font-size:20px;font-weight:700;color:var(--text) }
+  .about-desc { font-size:11px;color:var(--overlay);margin:4px 0 8px }
+  .about-ver { font-size:13px;font-weight:700;color:var(--mauve);margin-bottom:16px }
+  .about-info { font-size:10px;color:var(--overlay);line-height:1.8 }
+  .about-links { display:flex;gap:8px;justify-content:center;margin:16px 0 }
+  .about-copy { font-size:9px;color:var(--surface1);margin-top:12px }
   .oauth-section { display:flex;align-items:center;gap:8px;margin:8px 0 }
   .btn-google { padding:6px 16px;border-radius:6px;border:1px solid #dadce0;background:#fff;color:#3c4043;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px }
   .btn-google:hover { background:#f8f9fa }
