@@ -1,3 +1,6 @@
+[env]
+_.file = ".env"
+
 [tools]
 rust = "latest"
 node = "22.12"
