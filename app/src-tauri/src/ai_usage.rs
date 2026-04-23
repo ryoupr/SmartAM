@@ -157,6 +157,39 @@ pub fn get_summary() -> UsageSummary {
     }
 }
 
+pub fn get_available_months() -> Vec<String> {
+    let store = USAGE.lock().unwrap();
+    let mut months: Vec<String> = store.monthly.keys().cloned().collect();
+    months.sort();
+    months.reverse();
+    months
+}
+
+pub fn get_summary_for_month(month: &str) -> UsageSummary {
+    let store = USAGE.lock().unwrap();
+    let limit = BUDGET_LIMIT.load(std::sync::atomic::Ordering::Relaxed) as f64 / 100.0;
+    let monthly = store.monthly.get(month);
+    let total_cost = monthly.map(|m| m.total_cost_microcents as f64 / 1_000_000.0).unwrap_or(0.0);
+    let models: Vec<ModelUsageSummary> = monthly
+        .map(|m| {
+            m.models.iter().map(|(name, u)| ModelUsageSummary {
+                model: name.clone(),
+                input_tokens: u.input_tokens,
+                output_tokens: u.output_tokens,
+                cost_usd: u.cost_microcents as f64 / 1_000_000.0,
+                requests: u.requests,
+            }).collect()
+        })
+        .unwrap_or_default();
+    UsageSummary {
+        month: month.to_string(),
+        models,
+        total_cost_usd: total_cost,
+        budget_limit_usd: limit,
+        budget_remaining_usd: if limit > 0.0 { (limit - total_cost).max(0.0) } else { -1.0 },
+    }
+}
+
 fn get_pricing(model: &str) -> ModelPricing {
     let cache = PRICING.lock().unwrap();
     if let Some(p) = cache.get(model) {
