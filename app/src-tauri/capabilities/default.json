@@ -11,6 +11,7 @@
     "log:default",
     "notification:default",
     "dialog:default",
-    "updater:default"
+    "updater:default",
+    "process:default"
   ]
 }
