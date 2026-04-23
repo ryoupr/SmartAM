@@ -112,13 +112,77 @@ develop → feature/xxx → PR → develop → (リリース時) → main + tag
 4. commit → push → PR（base: `develop`）→ マージ
 5. リリース時: `develop` → `main` にマージ、バージョンバンプ、タグ作成
 
+### リリースフロー
+
+1. **バージョンバンプ** — 3ファイルを同時に更新してコミット:
+   - `app/package.json` / `app/src-tauri/Cargo.toml` / `app/src-tauri/tauri.conf.json`
+   - コミット: `chore: bump version to X.Y.Z`
+
+2. **develop → main マージ**（⚠️ マージ後に develop を削除しない）:
+   ```bash
+   git checkout main && git pull origin main
+   git merge develop --no-edit && git push origin main
+   ```
+
+3. **ビルド**（`.env` に `TAURI_SIGNING_PRIVATE_KEY` と `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` が必要）:
+   ```bash
+   cd app && npx tauri build
+   ```
+   成功すると以下が生成される:
+   - `target/release/bundle/dmg/SmartAM_X.Y.Z_aarch64.dmg`
+   - `target/release/bundle/macos/SmartAM.app.tar.gz`（updater 用）
+   - `target/release/bundle/macos/SmartAM.app.tar.gz.sig`（署名）
+
+   ⚠️ `Finished 1 updater signature` が出ない場合、署名鍵が未設定。`.env` を確認。
+
+4. **latest.json 生成**:
+   ```bash
+   cd /path/to/SmartAM
+   python3 -c "
+   import json, datetime
+   sig = open('app/src-tauri/target/release/bundle/macos/SmartAM.app.tar.gz.sig').read().strip()
+   json.dump({
+     'version': 'X.Y.Z',
+     'notes': 'リリースノート',
+     'pub_date': datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+     'platforms': {'darwin-aarch64': {
+       'signature': sig,
+       'url': 'https://github.com/ryoupr/SmartAM/releases/download/vX.Y.Z/SmartAM.app.tar.gz'
+     }}
+   }, open('/tmp/latest.json','w'), indent=2, ensure_ascii=False)
+   "
+   ```
+
+5. **タグ + GitHub Release**:
+   ```bash
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   gh release create vX.Y.Z \
+     app/src-tauri/target/release/bundle/dmg/SmartAM_X.Y.Z_aarch64.dmg \
+     app/src-tauri/target/release/bundle/macos/SmartAM.app.tar.gz \
+     app/src-tauri/target/release/bundle/macos/SmartAM.app.tar.gz.sig \
+     /tmp/latest.json \
+     --title "vX.Y.Z" --target main --notes "リリースノート"
+   ```
+
+6. **develop を main に同期**:
+   ```bash
+   git checkout develop && git merge main --no-edit && git push origin develop
+   ```
+
+7. **確認**: `gh release view vX.Y.Z`
+
+### 署名鍵
+
+- `.env` に `TAURI_SIGNING_PRIVATE_KEY`（base64）と `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` を設定
+- `mise.toml` の `[env] _.file = ".env"` で自動読み込み
+- `.env` は `.gitignore` 済み — 絶対にコミットしない
+
 ### バージョン管理
 
 バージョンは以下の3ファイルを同時に更新する:
 - `app/package.json`
 - `app/src-tauri/Cargo.toml`
 - `app/src-tauri/tauri.conf.json`
-- API keys (LLM providers, etc.) are stored in Tauri's `settings.json` on the user's local machine, not in the repository.
 - `.env` files are gitignored. Use `.env.example` as a template.
 
 ## UI/Design Conventions
