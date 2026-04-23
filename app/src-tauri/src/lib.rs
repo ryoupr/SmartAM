@@ -451,6 +451,8 @@ pub fn run() {
             trace::trace("APP", "setup: notification plugin ok");
             app.handle().plugin(tauri_plugin_dialog::init())?;
             trace::trace("APP", "setup: dialog plugin ok");
+            app.handle().plugin(tauri_plugin_process::init())?;
+            trace::trace("APP", "setup: process plugin ok");
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             trace::trace("APP", "setup: updater plugin ok");
             trace::trace("APP", "setup: complete");
