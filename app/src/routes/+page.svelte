@@ -534,6 +534,8 @@
     smtpConfig={acc() ? getSmtpConfig(acc()!) : null}
     calendarName={acc()?.calendar?.calendarName ?? '仕事'}
     {calendarNames}
+    dateFormat={settings.dateFormat}
+    timezone={settings.timezone}
   />
 </div>
 

@@ -5,8 +5,9 @@
   import CalendarPanel from './CalendarPanel.svelte';
   import EventCard from './EventCard.svelte';
   import type { MailDetail, Attachment, CalendarEvent } from '$lib/types';
+  import { formatMailDate } from '$lib/store';
 
-  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [] }: {
+  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [], dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
     mail: MailDetail | null;
     onArchive: () => void;
     onDelete: () => void;
@@ -20,6 +21,8 @@
     smtpConfig?: { email: string; auth_type: string; password: string; access_token: string; smtp_host: string; smtp_port: number } | null;
     calendarName?: string;
     calendarNames?: string[];
+    dateFormat?: string;
+    timezone?: string;
   } = $props();
 
   let openPanels: Set<string> = $state(new Set());
@@ -176,7 +179,7 @@
   {#if mail}
     <div class="header">
       <h2 class="subject">{mail.subject}</h2>
-      <div class="meta">From: {mail.from}  |  {mail.date}</div>
+      <div class="meta">From: {mail.from}  |  {formatMailDate(mail.date, dateFormat, timezone)}</div>
       <div class="meta">To: {mail.to}</div>
     </div>
     <div class="actions">
