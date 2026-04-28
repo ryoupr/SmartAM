@@ -68,6 +68,9 @@ impl MailCache {
 static CACHE: LazyLock<Mutex<MailCache>> = LazyLock::new(|| Mutex::new(MailCache::new()));
 static CACHE_MAX: AtomicUsize = AtomicUsize::new(100);
 
+/// Cache for ICS attachment data (key: "uid:part_index", value: base64-encoded data)
+static ICS_CACHE: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
 pub fn set_cache_max(max: usize) {
     CACHE_MAX.store(max, Ordering::Relaxed);
     let mut cache = CACHE.lock().unwrap();
@@ -469,6 +472,24 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                 let uid = msg.uid.unwrap_or(0);
                 if uid == 0 { continue; }
                 if let Ok(detail) = parse_mail_detail(uid, &msg) {
+                    // Pre-cache ICS attachment data
+                    if detail.attachments.iter().any(|a| a.filename.ends_with(".ics")) {
+                        if let Some(body_raw) = msg.body() {
+                            if let Ok(parsed) = mailparse::parse_mail(body_raw) {
+                                for att in &detail.attachments {
+                                    if att.filename.ends_with(".ics") {
+                                        if let Some(part) = parsed.subparts.get(att.index) {
+                                            if let Ok(data) = part.get_body_raw() {
+                                                let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
+                                                let key = format!("{}:{}", uid, att.index);
+                                                ICS_CACHE.lock().unwrap().insert(key, b64);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     cache.insert(uid, detail);
                     count += 1;
                 }
@@ -579,6 +600,12 @@ pub async fn download_attachment(config: &AccountConfig, folder: &str, uid: u32,
 }
 
 pub async fn fetch_attachment_data(config: &AccountConfig, folder: &str, uid: u32, part_index: usize) -> Result<String, String> {
+    // Check ICS cache first
+    let cache_key = format!("{}:{}", uid, part_index);
+    if let Some(b64) = ICS_CACHE.lock().unwrap().get(&cache_key) {
+        crate::trace::trace("IMAP", &format!("fetch_attachment uid={}:{}: ICS cache HIT", uid, part_index));
+        return Ok(b64.clone());
+    }
     let data = fetch_attachment_bytes(config, folder, uid, part_index).await?;
     Ok(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data))
 }
