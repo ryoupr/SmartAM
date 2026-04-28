@@ -108,6 +108,21 @@
       .replace(/<(iframe|object|embed|form)[^>]*\/?>/gi, '');
   }
 
+  function autoLinkUrls(html: string): string {
+    // Match URLs not already inside an href attribute or <a> tag
+    return html.replace(/(https?:\/\/[^\s<>"']+)/g, (url, _m, offset, str) => {
+      // Check if already inside an href="..." or <a ...>
+      const before = str.slice(Math.max(0, offset - 10), offset);
+      if (/href\s*=\s*["']?$/.test(before) || /<a\s[^>]*$/.test(str.slice(Math.max(0, offset - 200), offset))) return url;
+      return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+    });
+  }
+
+  function linkifyText(text: string): string {
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped.replace(/(https?:\/\/[^\s<>&]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  }
+
   function togglePanel(type: string) {
     const next = new Set(openPanels);
     if (next.has(type)) next.delete(type); else next.add(type);
@@ -244,17 +259,17 @@
     {#if translatedBody !== null}
       {#if mail.body_html}
         <div class="body body-html translated" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
-          <div bind:this={htmlBodyEl}>{@html sanitizeHtml(translatedBody)}</div>
+          <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(translatedBody))}</div>
         </div>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
       <div class="body body-html" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
-        <div bind:this={htmlBodyEl}>{@html sanitizeHtml(mail.body_html)}</div>
+        <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(mail.body_html))}</div>
       </div>
     {:else if mail.body_text.trim()}
-      <div class="body">{mail.body_text}</div>
+      <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
   {:else}
     <div class="empty">メールを選択してください</div>
