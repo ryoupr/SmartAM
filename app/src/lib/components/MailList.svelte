@@ -2,7 +2,7 @@
   import type { MailSummary } from '$lib/types';
   import { formatMailDate } from '$lib/store';
 
-  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
+  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo', selectedUids = $bindable(new Set<number>()), onMultiSelect }: {
     mails: MailSummary[];
     selectedUid: number | null;
     onSelect: (uid: number) => void;
@@ -14,15 +14,43 @@
     pageSize?: number;
     dateFormat?: string;
     timezone?: string;
+    selectedUids?: Set<number>;
+    onMultiSelect?: (uids: Set<number>) => void;
   } = $props();
+
+  let lastClickedUid: number | null = $state(null);
+
+  function handleClick(uid: number, e: MouseEvent) {
+    if (e.shiftKey && lastClickedUid !== null) {
+      // Range select
+      const startIdx = mails.findIndex(m => m.uid === lastClickedUid);
+      const endIdx = mails.findIndex(m => m.uid === uid);
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const next = new Set(selectedUids);
+        for (let i = from; i <= to; i++) next.add(mails[i].uid);
+        selectedUids = next;
+        onMultiSelect?.(selectedUids);
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      // Toggle select
+      const next = new Set(selectedUids);
+      if (next.has(uid)) next.delete(uid); else next.add(uid);
+      selectedUids = next;
+      onMultiSelect?.(selectedUids);
+    } else {
+      // Normal click: clear multi-select, select single
+      selectedUids = new Set();
+      onSelect(uid);
+    }
+    lastClickedUid = uid;
+  }
 
   function handleScroll(e: Event) {
     const el = e.target as HTMLElement;
-    // Each mail item is ~50px, calculate how many items are below viewport
     const itemHeight = 50;
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
     const remainingItems = remaining / itemHeight;
-    // Trigger when remaining items < half a page
     if (remainingItems < pageSize / 2 && !loadingMore && !loading && onLoadMore) {
       onLoadMore();
     }
@@ -35,11 +63,12 @@
     {#if searchQuery}<button class="clear" onclick={() => { searchQuery = ''; onSearchInput?.(''); }}>✕</button>{/if}
   </div>
   {#if searchQuery}<div class="result-count">{mails.length}件の検索結果</div>{/if}
+  {#if selectedUids.size > 0}<div class="result-count">{selectedUids.size}件選択中</div>{/if}
   {#if loading}
     <div class="empty">読み込み中...</div>
   {:else}
     {#each mails as mail}
-      <button class="mail-item" class:selected={selectedUid === mail.uid} class:unread={!mail.seen} onclick={() => onSelect(mail.uid)}>
+      <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} onclick={(e) => handleClick(mail.uid, e)}>
         <div class="mail-header">
           <span class="from">{mail.from}</span>
           <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>

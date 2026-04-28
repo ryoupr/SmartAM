@@ -44,6 +44,7 @@
   let searchResults: MailSummary[] | null = $state(null);
   let searching = $state(false);
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let selectedUids: Set<number> = $state(new Set());
 
   let filteredMails: MailSummary[] = $derived(
     searchResults !== null ? searchResults : mails
@@ -349,6 +350,50 @@
     doArchive(1);
   }
 
+  async function handleBulkArchive() {
+    const a = acc(); if (!a || selectedUids.size === 0) return;
+    const uids = [...selectedUids];
+    const prevMails = mails;
+    mails = mails.filter(m => !selectedUids.has(m.uid));
+    selectedMail = null; selectedUid = null;
+    const count = uids.length;
+    selectedUids = new Set();
+    showToast(`📦 ${count}件アーカイブしました`, () => { mails = prevMails; selectedUids = new Set(uids); });
+    for (const uid of uids) {
+      const doArchive = async (attempt: number) => {
+        try {
+          await ensureValidToken();
+          await invoke('archive_mail', { config: getImapConfig(a), folder: activeFolder, uid });
+        } catch (e) {
+          if (attempt < 10) setTimeout(() => doArchive(attempt + 1), 1000 * attempt);
+        }
+      };
+      doArchive(1);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const a = acc(); if (!a || selectedUids.size === 0) return;
+    const uids = [...selectedUids];
+    await ensureValidToken();
+    for (const uid of uids) {
+      try { await invoke('delete_mail', { config: getImapConfig(a), folder: activeFolder, uid }); } catch {}
+    }
+    mails = mails.filter(m => !new Set(uids).has(m.uid));
+    selectedMail = null; selectedUid = null; selectedUids = new Set();
+    showToast(`🗑 ${uids.length}件削除しました`);
+  }
+
+  async function handleBulkStar(add: boolean) {
+    const a = acc(); if (!a || selectedUids.size === 0) return;
+    await ensureValidToken();
+    for (const uid of [...selectedUids]) {
+      try { await invoke('toggle_star', { config: getImapConfig(a), folder: activeFolder, uid, add }); } catch {}
+    }
+    showToast(add ? `⭐ ${selectedUids.size}件にスター追加` : `⭐ ${selectedUids.size}件のスター解除`);
+    selectedUids = new Set();
+  }
+
   function handleDeleteConfirm() { confirmDelete = true; }
   async function handleDeleteExecute() {
     confirmDelete = false;
@@ -462,6 +507,14 @@
   }
 
   function execAction(action: string) {
+    // Bulk operations when multiple mails are selected
+    if (selectedUids.size > 0) {
+      switch (action) {
+        case 'archive': handleBulkArchive(); return;
+        case 'delete': handleBulkDelete(); return;
+        case 'star': handleBulkStar(true); return;
+      }
+    }
     const idx = mails.findIndex(m => m.uid === selectedUid);
     switch (action) {
       case 'nextMail':
@@ -515,7 +568,7 @@
     {syncing}
     {syncStatus}
   />
-  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={pageSize()} dateFormat={settings.dateFormat} timezone={settings.timezone} />
+  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={pageSize()} dateFormat={settings.dateFormat} timezone={settings.timezone} bind:selectedUids />
   <MailDetail
     mail={selectedMail}
     onArchive={handleArchive}
