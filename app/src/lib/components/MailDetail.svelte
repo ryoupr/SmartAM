@@ -35,8 +35,8 @@
   let translating = $state(false);
   let icsEvents: CalendarEvent[] = $state([]);
   let conflictsMap: Record<string, string[]> = $state({});
-  let htmlBodyEl: HTMLDivElement | undefined = $state(undefined);
-  let htmlScale = $state(1);
+  let iframeEl: HTMLIFrameElement | undefined = $state(undefined);
+  let iframeHeight = $state(200);
 
   // Reset panels when mail changes
   $effect(() => {
@@ -85,53 +85,29 @@
   });
 
   $effect(() => {
-    if (!htmlBodyEl) return;
-    const wrapper = htmlBodyEl.parentElement as HTMLElement | null;
-    if (!wrapper) return;
-    const detail = htmlBodyEl.closest('.detail') as HTMLElement | null;
-    if (!detail) return;
-    const compute = () => {
-      const availW = detail.clientWidth - 32 - 32;
-      // Reset zoom to measure natural width
-      wrapper.style.zoom = '1';
-      // Remove max-width on non-img elements to get true content width
-      const els = htmlBodyEl!.querySelectorAll(':not(img)') as NodeListOf<HTMLElement>;
-      els.forEach(el => el.style.setProperty('max-width', 'none', 'important'));
-      const naturalW = htmlBodyEl!.scrollWidth;
-      els.forEach(el => el.style.removeProperty('max-width'));
-      if (naturalW > availW) {
-        htmlScale = availW / naturalW;
-      } else {
-        htmlScale = 1;
-      }
-      wrapper.style.zoom = String(htmlScale);
+    if (!iframeEl) return;
+    const adjustHeight = () => {
+      try {
+        const doc = iframeEl!.contentDocument;
+        if (doc?.body) {
+          iframeHeight = doc.body.scrollHeight + 16;
+        }
+      } catch {}
     };
-    setTimeout(compute, 50);
-    const ro = new ResizeObserver(compute);
-    ro.observe(detail);
-    return () => ro.disconnect();
+    iframeEl.addEventListener('load', adjustHeight);
+    return () => iframeEl?.removeEventListener('load', adjustHeight);
   });
 
-  function sanitizeHtml(html: string): string {
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
-      .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
-      .replace(/href\s*=\s*"javascript:[^"]*"/gi, 'href="#"')
-      .replace(/<(iframe|object|embed|form)[^>]*>[\s\S]*?<\/\1>/gi, '')
-      .replace(/<(iframe|object|embed|form)[^>]*\/?>/gi, '');
-  }
-
-  function autoLinkUrls(html: string): string {
-    // Match URLs only outside of HTML tags
-    return html.replace(/(https?:\/\/[^\s<>"']+)/g, (url, _m, offset, str) => {
-      // Check if inside any HTML tag (between < and >)
-      const lastOpen = str.lastIndexOf('<', offset);
-      const lastClose = str.lastIndexOf('>', offset);
-      if (lastOpen > lastClose) return url; // inside a tag
-      return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
-    });
+  function buildSrcdoc(html: string): string {
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none'"><base target="_blank"><style>
+body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
+img{max-width:100%;height:auto}
+table{border-collapse:collapse;max-width:100%;width:100%}
+td,th{padding:4px 8px;word-break:break-word}
+a{color:#1e66f5}
+blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
+*{max-width:100%;box-sizing:border-box}
+</style></head><body>${html}</body></html>`;
   }
 
   function linkifyText(text: string): string {
@@ -274,16 +250,12 @@
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <div class="body body-html translated">
-          <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(translatedBody))}</div>
-        </div>
+        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <div class="body body-html">
-        <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(mail.body_html))}</div>
-      </div>
+      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
     {:else if mail.body_text.trim()}
       <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
@@ -340,16 +312,9 @@
   .att-chip:hover { border-color:var(--mauve) }
   .body { font-size:13px;line-height:1.7;white-space:pre-wrap;margin-top:12px;background:#fff;color:#1a1a1a;padding:16px;border-radius:8px }
   .body :global(a) { color:#1e66f5 }
-  .body-html { white-space:normal;word-break:break-word;overflow:hidden;max-width:100% }
-  .body-html :global(*) { max-width:100%!important;box-sizing:border-box;color:inherit }
-  .body-html :global(body), .body-html :global(html) { margin:0;padding:0;width:100%!important }
-  .body-html :global(a) { color:#1e66f5!important;text-decoration:underline }
-  .body-html :global(img) { max-width:100%!important;height:auto!important }
-  .body-html :global(table) { border-collapse:collapse;width:100%!important;table-layout:fixed }
-  .body-html :global(td), .body-html :global(th) { padding:4px 8px;word-break:break-word }
-  .body-html :global(blockquote) { border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666 }
+  .mail-iframe { width:100%;border:none;margin-top:12px;border-radius:8px;background:#fff }
+  .mail-iframe.translated { border:1px solid var(--blue) }
   .translated { border:1px solid var(--blue);background:var(--mantle);color:var(--text) }
-  .body-html :global(div), .body-html :global(p), .body-html :global(span) { max-width:100%!important }
   .empty { color:var(--overlay);text-align:center;padding:80px 0;font-size:14px }
   .pov { position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:55 }
   .pom { width:820px;height:600px;background:var(--base);border:1px solid var(--surface1);border-radius:8px;display:flex;flex-direction:column }
