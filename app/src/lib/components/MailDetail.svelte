@@ -86,14 +86,29 @@
 
   $effect(() => {
     if (!htmlBodyEl) return;
-    const ro = new ResizeObserver(() => {
-      const container = htmlBodyEl!.parentElement;
-      if (!container) return;
-      const cw = container.clientWidth - 32;
-      const sw = htmlBodyEl!.scrollWidth;
-      htmlScale = sw > cw ? cw / sw : 1;
-    });
-    ro.observe(htmlBodyEl);
+    const wrapper = htmlBodyEl.parentElement as HTMLElement | null;
+    if (!wrapper) return;
+    const detail = htmlBodyEl.closest('.detail') as HTMLElement | null;
+    if (!detail) return;
+    const compute = () => {
+      const availW = detail.clientWidth - 32 - 32;
+      // Reset zoom to measure natural width
+      wrapper.style.zoom = '1';
+      // Remove max-width on non-img elements to get true content width
+      const els = htmlBodyEl!.querySelectorAll(':not(img)') as NodeListOf<HTMLElement>;
+      els.forEach(el => el.style.setProperty('max-width', 'none', 'important'));
+      const naturalW = htmlBodyEl!.scrollWidth;
+      els.forEach(el => el.style.removeProperty('max-width'));
+      if (naturalW > availW) {
+        htmlScale = availW / naturalW;
+      } else {
+        htmlScale = 1;
+      }
+      wrapper.style.zoom = String(htmlScale);
+    };
+    setTimeout(compute, 50);
+    const ro = new ResizeObserver(compute);
+    ro.observe(detail);
     return () => ro.disconnect();
   });
 
@@ -109,11 +124,12 @@
   }
 
   function autoLinkUrls(html: string): string {
-    // Match URLs not already inside an href attribute or <a> tag
+    // Match URLs only outside of HTML tags
     return html.replace(/(https?:\/\/[^\s<>"']+)/g, (url, _m, offset, str) => {
-      // Check if already inside an href="..." or <a ...>
-      const before = str.slice(Math.max(0, offset - 10), offset);
-      if (/href\s*=\s*["']?$/.test(before) || /<a\s[^>]*$/.test(str.slice(Math.max(0, offset - 200), offset))) return url;
+      // Check if inside any HTML tag (between < and >)
+      const lastOpen = str.lastIndexOf('<', offset);
+      const lastClose = str.lastIndexOf('>', offset);
+      if (lastOpen > lastClose) return url; // inside a tag
       return `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
     });
   }
@@ -258,14 +274,14 @@
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <div class="body body-html translated" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
+        <div class="body body-html translated">
           <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(translatedBody))}</div>
         </div>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <div class="body body-html" style:transform="scale({htmlScale})" style:transform-origin="top left" style:width="{htmlScale < 1 ? `${100/htmlScale}%` : '100%'}">
+      <div class="body body-html">
         <div bind:this={htmlBodyEl}>{@html autoLinkUrls(sanitizeHtml(mail.body_html))}</div>
       </div>
     {:else if mail.body_text.trim()}
@@ -324,12 +340,12 @@
   .att-chip:hover { border-color:var(--mauve) }
   .body { font-size:13px;line-height:1.7;white-space:pre-wrap;margin-top:12px;background:#fff;color:#1a1a1a;padding:16px;border-radius:8px }
   .body :global(a) { color:#1e66f5 }
-  .body-html { white-space:normal;word-break:break-word;overflow-x:auto;max-width:100% }
+  .body-html { white-space:normal;word-break:break-word;overflow:hidden;max-width:100% }
   .body-html :global(*) { max-width:100%!important;box-sizing:border-box;color:inherit }
   .body-html :global(body), .body-html :global(html) { margin:0;padding:0;width:100%!important }
   .body-html :global(a) { color:#1e66f5!important;text-decoration:underline }
   .body-html :global(img) { max-width:100%!important;height:auto!important }
-  .body-html :global(table) { border-collapse:collapse;max-width:100%!important;width:auto!important;table-layout:fixed }
+  .body-html :global(table) { border-collapse:collapse;width:100%!important;table-layout:fixed }
   .body-html :global(td), .body-html :global(th) { padding:4px 8px;word-break:break-word }
   .body-html :global(blockquote) { border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666 }
   .translated { border:1px solid var(--blue);background:var(--mantle);color:var(--text) }
