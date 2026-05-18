@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use crate::LlmConfig;
-use regex::Regex;
+use std::sync::LazyLock;
+
+static RE_DATETIME: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"^[0-9T:\-+]+$").unwrap());
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CalendarEvent {
@@ -40,11 +42,10 @@ pub async fn register_google_calendar(event: &CalendarEvent, access_token: &str)
 
 pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str) -> Result<String, String> {
     // Validate datetime fields to prevent AppleScript injection
-    let dt_re = Regex::new(r"^[0-9T:\-+]+$").unwrap();
-    if !dt_re.is_match(&event.start) {
+    if !RE_DATETIME.is_match(&event.start) {
         return Err(format!("不正な開始日時: {}", event.start));
     }
-    if !dt_re.is_match(&event.end) {
+    if !RE_DATETIME.is_match(&event.end) {
         return Err(format!("不正な終了日時: {}", event.end));
     }
     // Sanitize calendar_name: remove quotes and newlines
@@ -103,3 +104,4 @@ end tell"#,
         Err(format!("登録失敗: {}", String::from_utf8_lossy(&output.stderr)))
     }
 }
+

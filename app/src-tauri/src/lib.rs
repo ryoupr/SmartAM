@@ -1,4 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+
+static RE_REGION: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"^[a-z0-9-]+$").unwrap());
 
 mod ai_client;
 mod ai_usage;
@@ -194,7 +197,7 @@ async fn send_mail_with_attachments(config: SmtpConfig, to: Vec<String>, cc: Vec
 #[tauri::command]
 async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<String>, String> {
     trace::trace("CMD", "list_bedrock_models");
-    if !regex::Regex::new(r"^[a-z0-9-]+$").unwrap().is_match(&region) {
+    if !RE_REGION.is_match(&region) {
         return Err("不正なリージョン名です".into());
     }
     let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");

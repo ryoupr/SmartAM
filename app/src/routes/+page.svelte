@@ -84,7 +84,7 @@
       a.token_expires_at = tokens.expires_at;
       settings.accounts[settings.activeAccountIndex] = { ...a };
       await saveSettings(settings);
-    } catch (e) { error = 'トークン更新失敗: ' + String(e); }
+    } catch (e) { throw new Error('トークン更新失敗: ' + String(e)); }
   }
 
   onMount(async () => {
@@ -259,6 +259,7 @@
               a.access_token = tokens.access_token;
               a.token_expires_at = tokens.expires_at;
               settings.accounts[i] = { ...a };
+              await saveSettings(settings);
             }
           }
           const [result, total] = await invoke<[MailSummary[], number]>('fetch_mail_page', { config: getImapConfig(a), folder, offset: 0, limit: pageSize() * 2 });
@@ -286,7 +287,7 @@
 
   async function handleFolderChange(folder: string, accountIndex?: number) {
     saveFolderCache();
-    if (accountIndex !== undefined) { settings.activeAccountIndex = accountIndex; fetchCalendarNames(); }
+    if (accountIndex !== undefined) { settings.activeAccountIndex = accountIndex; fetchCalendarNames(); selectedUids = new Set(); startPolling(); }
     activeFolder = folder;
     selectedMail = null; selectedUid = null;
     searchQuery = ''; searchResults = null;
@@ -468,6 +469,7 @@
 
   function showToast(msg: string, undo?: () => void) {
     toast = { msg, undo }; if (undo) lastUndo = undo; setTimeout(() => toast = null, 5000);
+    if (undo) setTimeout(() => { if (lastUndo === undo) lastUndo = null; }, 5000);
   }
 
   // --- Keyboard shortcuts ---
@@ -548,7 +550,7 @@
       case 'forward': if (selectedMail) { composeBody = `\n\n---------- Forwarded ----------\n${selectedMail.body_text ?? ''}`; composeMode = 'forward'; } break;
       case 'archive': if (selectedMail) handleArchive(); break;
       case 'delete': if (selectedMail) handleDeleteConfirm(); break;
-      case 'star': if (selectedUid) { const next = true; handleStar(next); } break;
+      case 'star': if (selectedUid) { const next = !((selectedMail as any)?.starred ?? false); handleStar(next); } break;
       case 'undo': if (lastUndo) { lastUndo(); lastUndo = null; } break;
       case 'compose': composeBody = ''; composeMode = 'new'; attachmentPaths = []; break;
       case 'search': document.querySelector<HTMLInputElement>('.mail-list input')?.focus(); break;
@@ -634,7 +636,7 @@
 {/if}
 
 {#if showSettings}
-  <Settings {settings} onClose={() => showSettings = false} onSave={async (s) => { try { const plain = JSON.parse(JSON.stringify(s)); await saveSettings(plain); settings = plain; invoke('set_ai_budget', { limitUsd: plain.aiBudgetLimitUsd ?? 0 }).catch(() => {}); showSettings = false; startPolling(); await fetchMails(); } catch (e) { error = '設定の保存に失敗: ' + String(e); } }} />
+  <Settings {settings} onClose={() => showSettings = false} onSave={async (s) => { try { const plain = JSON.parse(JSON.stringify(s)); await saveSettings(plain); settings = plain; invoke('set_ai_budget', { limitUsd: plain.aiBudgetLimitUsd ?? 0 }).catch(() => {}); showSettings = false; startPolling(); await fetchMails(); fetchCalendarNames(); } catch (e) { error = '設定の保存に失敗: ' + String(e); } }} />
 {/if}
 
 {#if updateAvailable}

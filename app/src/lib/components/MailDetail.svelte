@@ -53,9 +53,11 @@
       // Detect and parse ics attachment
       const icsAtt = mail?.attachments.find(a => a.filename.endsWith('.ics'));
       if (icsAtt) {
+        const currentUid = uid;
         onFetchAttachmentData(icsAtt.index).then(b64 =>
           invoke<CalendarEvent[]>('parse_ics_attachment', { data: b64 })
         ).then(async evts => {
+          if (mail?.uid !== currentUid) return;
           if (evts.length > 0) {
             icsEvents = evts;
             if (smtpConfig?.auth_type === 'oauth') {

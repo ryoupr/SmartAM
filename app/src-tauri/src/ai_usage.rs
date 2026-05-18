@@ -158,7 +158,7 @@ pub fn get_summary() -> UsageSummary {
 }
 
 pub fn get_available_months() -> Vec<String> {
-    let store = USAGE.lock().unwrap();
+    let store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
     let mut months: Vec<String> = store.monthly.keys().cloned().collect();
     months.sort();
     months.reverse();
@@ -214,7 +214,10 @@ fn get_pricing(model: &str) -> ModelPricing {
 
 pub async fn fetch_pricing() {
     crate::trace::trace("AI_USAGE", "Fetching Bedrock pricing...");
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
     let resp = client.get("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/index.json")
         .send().await;
 
@@ -222,6 +225,14 @@ pub async fn fetch_pricing() {
         Ok(r) if r.status().is_success() => r,
         _ => { crate::trace::trace("AI_USAGE", "Failed to fetch pricing"); return; }
     };
+
+    // Check content length to prevent memory spike
+    if let Some(len) = resp.content_length() {
+        if len > 10_000_000 {
+            crate::trace::trace("AI_USAGE", &format!("Pricing response too large: {} bytes", len));
+            return;
+        }
+    }
 
     #[derive(Deserialize)]
     struct PriceIndex {
@@ -251,7 +262,17 @@ pub async fn fetch_pricing() {
         description: String,
     }
 
-    let data: PriceIndex = match resp.json().await {
+    // If content_length was None, fetch bytes and check size
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(e) => { crate::trace::trace("AI_USAGE", &format!("Failed to read pricing body: {e}")); return; }
+    };
+    if bytes.len() > 10_000_000 {
+        crate::trace::trace("AI_USAGE", &format!("Pricing response too large: {} bytes", bytes.len()));
+        return;
+    }
+
+    let data: PriceIndex = match serde_json::from_slice(&bytes) {
         Ok(d) => d,
         Err(e) => { crate::trace::trace("AI_USAGE", &format!("Parse pricing failed: {e}")); return; }
     };

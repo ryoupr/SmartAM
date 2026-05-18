@@ -6,7 +6,7 @@
     body?: string;
     signature?: string;
     onClose: () => void;
-    onSend: (data: { to: string; cc: string; bcc: string; subject: string; body: string }) => void;
+    onSend: (data: { to: string; cc: string; bcc: string; subject: string; body: string }) => Promise<void>;
     attachmentPaths?: string[];
   } = $props();
 
@@ -21,9 +21,11 @@
 
   const title = mode === 'reply' ? '返信作成' : mode === 'forward' ? '転送' : '新規メール作成';
 
-  function handleSend() {
+  async function handleSend() {
     sending = true;
-    onSend({ to: toField, cc: ccField, bcc: bccField, subject: subjectField, body: bodyField });
+    try { await onSend({ to: toField, cc: ccField, bcc: bccField, subject: subjectField, body: bodyField }); }
+    catch {}
+    finally { sending = false; }
   }
 
   async function addAttachment() {

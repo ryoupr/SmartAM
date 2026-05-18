@@ -78,6 +78,7 @@ pub fn set_cache_max(max: usize) {
     crate::trace::trace("IMAP", &format!("cache max set to {}, bytes: {}KB", max, cache.estimated_bytes / 1024));
 }
 
+// TODO: FOLDER_MAP should be per-account
 static FOLDER_MAP: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn resolve_folder(folder: &str) -> String {
@@ -653,3 +654,4 @@ async fn fetch_attachment_bytes(config: &AccountConfig, folder: &str, uid: u32, 
         })
     }).await.map_err(|e| format!("{e}"))?
 }
+

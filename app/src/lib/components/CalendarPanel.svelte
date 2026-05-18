@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { onMount } from 'svelte';
 
   let { mailBody, llmConfig, calendarName = '仕事', calendarNames = [], provider = 'apple', accessToken = '', onClose }: {
     mailBody: string;
@@ -19,7 +20,7 @@
   let toast = $state('');
   let calName = $state(calendarName);
 
-  $effect(() => {
+  onMount(() => {
     invoke<CalEvent[]>('detect_calendar_events', { llm: llmConfig, mailBody })
       .then(r => { events = r; loading = false; })
       .catch(() => { loading = false; });
