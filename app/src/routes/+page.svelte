@@ -308,6 +308,8 @@
     const folder = activeFolder;
     try {
       selectedMail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder, uid });
+      const m = mails.find(x => x.uid === uid);
+      if (m && !m.seen) { m.seen = true; mails = mails; }
       const t2 = performance.now();
       trace('PERF', `select uid=${uid}: token=${(t1-t0)|0}ms, fetch=${(t2-t1)|0}ms, total=${(t2-t0)|0}ms`);
       // Preload surrounding mails in background
