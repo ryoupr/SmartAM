@@ -34,6 +34,15 @@ pub fn trace(tag: &str, msg: &str) {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
         }
+        // Rotate if > 5MB
+        if path.exists() {
+            if let Ok(meta) = fs::metadata(path) {
+                if meta.len() > 5_000_000 {
+                    let rotated = path.with_extension("log.old");
+                    let _ = fs::rename(path, &rotated);
+                }
+            }
+        }
         if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
             let _ = f.write_all(line.as_bytes());
             let _ = f.flush();

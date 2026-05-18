@@ -205,7 +205,7 @@
 - [ ] Apple Calendar（EventKit / macOSネイティブ）— MVP
 - [ ] Google Calendar（REST API）— MVP
 - [ ] Jira（OAuth 2.0 3LO）— Phase 2
-- [ ] LLMプロバイダー（LiteLLM経由）— MVP
+- LLMプロバイダー（OpenAI互換API直接接続）— MVP
 
 ---
 
@@ -215,20 +215,22 @@
 
 - Rustバックエンド + macOS WebKit（WKWebView）
 - Electronと比較してメモリ約58%削減、バンドルサイズ約96%削減
-- LiteLLMをsidecarバイナリとしてバンドル（`externalBin` + `tauri_plugin_shell`）
+- Rust バックエンドから OpenAI 互換 API を直接呼び出し（`ai_client.rs`）
 
 **フロントエンド**: SvelteKit  
 **バックエンド**: Rust（Tauri core）
 
-### 6.2 LLM統合: LiteLLM Proxy（sidecar）
+### 6.2 LLM統合: OpenAI互換API + Bedrock Converse
 
-| プロバイダー | モデル例 |
+> 当初 LiteLLM sidecar を検討したが、Rust バックエンドから直接 OpenAI 互換 `/v1/chat/completions` エンドポイントを呼ぶ方式に変更。Bedrock は Converse API を直接使用。
+
+| プロバイダー | 接続方式 |
 |-------------|---------|
-| Ollama（ローカル） | llama3, mistral, etc. |
-| OpenAI | gpt-4o, gpt-4o-mini |
-| Anthropic | claude-3-5-sonnet |
-| AWS Bedrock | claude on bedrock |
-| Google Gemini | gemini-2.5-flash |
+| Ollama（ローカル） | OpenAI互換API (localhost) |
+| OpenAI | OpenAI API 直接 |
+| Anthropic | OpenAI互換API |
+| AWS Bedrock | Converse API (SigV4認証) |
+| Google Gemini | OpenAI互換API |
 
 ### 6.3 メール処理
 

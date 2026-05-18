@@ -41,6 +41,7 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
     trace::trace("OAUTH", &format!("Listening on port {port}"));
 
     let cid = client_id();
+    let state = format!("{:x}{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(), std::process::id());
     let url = reqwest::Url::parse_with_params(AUTH_URL, &[
         ("client_id", cid.as_str()),
         ("redirect_uri", redirect_uri.as_str()),
@@ -48,6 +49,7 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
         ("scope", SCOPE),
         ("access_type", "offline"),
         ("prompt", "consent"),
+        ("state", state.as_str()),
     ])
     .map_err(|e| format!("{e}"))?;
 
@@ -74,6 +76,17 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
         .and_then(|query_and_rest| query_and_rest.split_whitespace().next())
         .and_then(|query| query.split('&').find_map(|p| p.strip_prefix("code=")))
         .ok_or("認証コードが見つかりません".to_string())?;
+
+    // Verify state parameter (CSRF protection)
+    let received_state = request
+        .lines()
+        .next()
+        .and_then(|line| line.split('?').nth(1))
+        .and_then(|query_and_rest| query_and_rest.split_whitespace().next())
+        .and_then(|query| query.split('&').find_map(|p| p.strip_prefix("state=")));
+    if received_state != Some(&state) {
+        return Err("state パラメータが一致しません（CSRF検出）".to_string());
+    }
 
     let html = "<html><body style='font-family:sans-serif;text-align:center;padding:40px;background:#1e1e2e;color:#cdd6f4'>\
         <h2>認証完了</h2><p>SmartAMに戻ってください。このタブは閉じて構いません。</p></body></html>";
@@ -172,12 +185,13 @@ pub async fn refresh(refresh_token: &str) -> Result<OAuthTokens, String> {
         .map_err(|e| format!("レスポンス解析失敗: {e}"))?;
 
     let expires_at = chrono::Utc::now().timestamp() + data.expires_in;
+    let email = fetch_email(&data.access_token).await.unwrap_or_default();
     trace::trace("OAUTH", "Token refresh successful");
 
     Ok(OAuthTokens {
         access_token: data.access_token,
         refresh_token: refresh_token.to_string(),
         expires_at,
-        email: String::new(),
+        email,
     })
 }
