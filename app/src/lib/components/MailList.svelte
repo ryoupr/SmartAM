@@ -18,6 +18,14 @@
     onMultiSelect?: (uids: Set<number>) => void;
   } = $props();
 
+  let listEl: HTMLDivElement | undefined = $state(undefined);
+
+  $effect(() => {
+    if (!selectedUid || !listEl) return;
+    const btn = listEl.querySelector(`[data-uid="${selectedUid}"]`) as HTMLElement | null;
+    if (btn) { btn.focus({ preventScroll: false }); btn.scrollIntoView({ block: 'nearest' }); }
+  });
+
   let lastClickedUid: number | null = $state(null);
 
   function handleClick(uid: number, e: MouseEvent) {
@@ -57,7 +65,7 @@
   }
 </script>
 
-<div class="mail-list" onscroll={handleScroll}>
+<div class="mail-list" onscroll={handleScroll} bind:this={listEl}>
   <div class="search">
     <input type="text" placeholder="🔍 検索..." bind:value={searchQuery} oninput={(e) => onSearchInput?.(e.currentTarget.value)} />
     {#if searchQuery}<button class="clear" onclick={() => { searchQuery = ''; onSearchInput?.(''); }}>✕</button>{/if}
@@ -68,7 +76,7 @@
     <div class="empty">読み込み中...</div>
   {:else}
     {#each mails as mail}
-      <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} onclick={(e) => handleClick(mail.uid, e)}>
+      <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
         <div class="mail-header">
           <span class="from">{mail.from}</span>
           <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
@@ -92,8 +100,9 @@
   .search input::placeholder { color:var(--overlay) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
   .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px }
-  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box }
+  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box;outline:none }
   .mail-item:hover { background:var(--surface0) }
+  .mail-item:focus-visible { background:var(--surface0);border-left-color:var(--mauve) }
   .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }
   .mail-item.unread { background:rgba(137,180,250,0.06) }
   .mail-item.unread .from { font-weight:700 }
