@@ -92,6 +92,15 @@
         const doc = iframeEl!.contentDocument;
         if (doc?.body) {
           iframeHeight = doc.body.scrollHeight + 16;
+          doc.addEventListener('click', (e: MouseEvent) => {
+            const a = (e.target as HTMLElement)?.closest('a[href]') as HTMLAnchorElement | null;
+            if (!a) return;
+            const href = a.getAttribute('href');
+            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+              e.preventDefault();
+              invoke('open_external_url', { url: href }).catch(() => {});
+            }
+          });
         }
       } catch {}
     };
