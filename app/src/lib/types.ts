@@ -49,3 +49,5 @@ export interface CalendarEvent {
   status: string;
   description: string;
 }
+
+export type DetectedCalendarEvent = { title: string; start: string; end: string; location: string };

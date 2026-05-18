@@ -222,6 +222,9 @@ async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<Stri
 
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("無効なURLスキーム".into());
+    }
     open::that(&url).map_err(|e| format!("URL open failed: {e}"))
 }
 

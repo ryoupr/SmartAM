@@ -78,40 +78,40 @@ pub fn set_cache_max(max: usize) {
     crate::trace::trace("IMAP", &format!("cache max set to {}, bytes: {}KB", max, cache.estimated_bytes / 1024));
 }
 
-// TODO: FOLDER_MAP should be per-account
-static FOLDER_MAP: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static FOLDER_MAP: LazyLock<Mutex<HashMap<String, HashMap<String, String>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn resolve_folder(folder: &str) -> String {
+fn resolve_folder(email: &str, folder: &str) -> String {
     let map = FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner());
-    map.get(folder).cloned().unwrap_or_else(|| folder.to_string())
+    map.get(email)
+        .and_then(|m| m.get(folder).cloned())
+        .unwrap_or_else(|| folder.to_string())
 }
 
 /// Discover Gmail special-use folders via IMAP LIST and populate FOLDER_MAP.
-fn discover_folders(session: &mut ImapSession) -> Result<(), String> {
+fn discover_folders(session: &mut ImapSession, email: &str) -> Result<(), String> {
     let folders = session.list(Some(""), Some("*"))
         .map_err(|e| format!("フォルダ一覧取得失敗: {e}"))?;
 
-    let mut map = FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner());
-    map.insert("INBOX".to_string(), "INBOX".to_string());
+    let mut global_map = FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner());
+    let account_map = global_map.entry(email.to_string()).or_default();
+    account_map.insert("INBOX".to_string(), "INBOX".to_string());
 
     for f in folders.iter() {
         let name = f.name().to_string();
-        // imap crate NameAttribute: NoInferiors, NoSelect, Marked, Unmarked, Custom(Cow<str>)
-        // Gmail special-use attributes (e.g. \All, \Sent) are stored as Custom("\\All") etc.
         let has_attr = |target: &str| -> bool {
             f.attributes().iter().any(|a| match a {
                 imap::types::NameAttribute::Custom(cow) => cow.eq_ignore_ascii_case(target),
                 _ => false,
             })
         };
-        if has_attr("\\All") { map.insert("ALL".to_string(), name.clone()); map.insert("STARRED".to_string(), name.clone()); }
-        if has_attr("\\Sent") { map.insert("SENT".to_string(), name.clone()); }
-        if has_attr("\\Drafts") { map.insert("DRAFTS".to_string(), name.clone()); }
-        if has_attr("\\Junk") { map.insert("SPAM".to_string(), name.clone()); }
-        if has_attr("\\Trash") { map.insert("TRASH".to_string(), name.clone()); }
+        if has_attr("\\All") { account_map.insert("ALL".to_string(), name.clone()); account_map.insert("STARRED".to_string(), name.clone()); }
+        if has_attr("\\Sent") { account_map.insert("SENT".to_string(), name.clone()); }
+        if has_attr("\\Drafts") { account_map.insert("DRAFTS".to_string(), name.clone()); }
+        if has_attr("\\Junk") { account_map.insert("SPAM".to_string(), name.clone()); }
+        if has_attr("\\Trash") { account_map.insert("TRASH".to_string(), name.clone()); }
     }
 
-    crate::trace::trace("IMAP", &format!("discover_folders: {:?}", *map));
+    crate::trace::trace("IMAP", &format!("discover_folders[{}]: {:?}", email, account_map));
     Ok(())
 }
 
@@ -173,8 +173,8 @@ where
         None => {
             crate::trace::trace("IMAP", "pool: new connection");
             let mut s = connect_sync(config)?;
-            if FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
-                let _ = discover_folders(&mut s);
+            if !FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner()).contains_key(&config.email) {
+                let _ = discover_folders(&mut s, &config.email);
             }
             s
         }
@@ -253,7 +253,7 @@ pub async fn fetch_list(config: &AccountConfig, folder: &str, count: u32) -> Res
         with_session(&config, |session| {
             if folder == "STARRED" {
                 // STARRED: search FLAGGED across all mail
-                session.select(&resolve_folder("ALL")).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
+                session.select(&resolve_folder(&config.email, "ALL")).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
                 let uids: Vec<u32> = session.uid_search("FLAGGED")
                     .map_err(|e| format!("検索失敗: {e}"))?
                     .into_iter().collect();
@@ -264,7 +264,7 @@ pub async fn fetch_list(config: &AccountConfig, folder: &str, count: u32) -> Res
                 crate::trace::trace("IMAP", &format!("fetch_list STARRED: done, {} results", results.len()));
                 Ok(results)
             } else {
-                let mailbox = session.select(&resolve_folder(&folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
+                let mailbox = session.select(&resolve_folder(&config.email, &folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
                 let total = mailbox.exists;
                 crate::trace::trace("IMAP", &format!("fetch_list {}: {total} messages", folder));
                 if total == 0 { return Ok(vec![]); }
@@ -298,7 +298,19 @@ pub async fn fetch_mail_page(config: &AccountConfig, folder: &str, offset: u32, 
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            let imap_folder = resolve_folder(&folder);
+            if folder == "STARRED" {
+                session.select(&resolve_folder(&config.email, "ALL")).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
+                let uids: Vec<u32> = session.uid_search("FLAGGED")
+                    .map_err(|e| format!("検索失敗: {e}"))?
+                    .into_iter().collect();
+                let total = uids.len() as u32;
+                if total == 0 { return Ok((vec![], 0)); }
+                let page: Vec<u32> = uids.into_iter().rev().skip(offset as usize).take(limit as usize).collect();
+                let mut results = fetch_envelope_list(session, &page)?;
+                results.sort_by(|a, b| b.uid.cmp(&a.uid));
+                Ok((results, total))
+            } else {
+            let imap_folder = resolve_folder(&config.email, &folder);
             let mailbox = session.select(&imap_folder).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
             let total = mailbox.exists;
             if total == 0 { return Ok((vec![], 0)); }
@@ -326,6 +338,7 @@ pub async fn fetch_mail_page(config: &AccountConfig, folder: &str, offset: u32, 
             results.reverse();
             crate::trace::trace("IMAP", &format!("fetch_mail_page: got {} results", results.len()));
             Ok((results, total))
+            }
         })
     }).await.map_err(|e| format!("{e}"))?
 }
@@ -336,7 +349,7 @@ pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, lim
     let query = query.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            let imap_folder = resolve_folder(&folder);
+            let imap_folder = resolve_folder(&config.email, &folder);
             session.select(&imap_folder).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
 
             // Try Gmail X-GM-RAW first, fall back to standard IMAP SEARCH
@@ -363,7 +376,7 @@ pub async fn fetch_new_mails(config: &AccountConfig, folder: &str, since_uid: u3
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            let imap_folder = resolve_folder(&folder);
+            let imap_folder = resolve_folder(&config.email, &folder);
             session.select(&imap_folder).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
 
             let range = format!("{}:*", since_uid + 1);
@@ -440,7 +453,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            session.select(resolve_folder(&folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
             let messages = session.uid_fetch(uid.to_string(), "(UID ENVELOPE BODY[])")
                 .map_err(|e| format!("メール取得失敗: {e}"))?;
             let msg = messages.iter().next().ok_or("メールが見つかりません".to_string())?;
@@ -467,7 +480,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            session.select(resolve_folder(&folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
             let uid_range: String = uncached.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
             crate::trace::trace("IMAP", &format!("preload: fetching {} mails", uncached.len()));
 
@@ -533,8 +546,8 @@ pub async fn archive_mail(config: &AccountConfig, folder: &str, uid: u32) -> Res
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            let dest = resolve_folder("ALL");
-            session.select(resolve_folder(&folder)).map_err(|e| format!("{e}"))?;
+            let dest = resolve_folder(&config.email, "ALL");
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("{e}"))?;
             session.uid_mv(uid.to_string(), &dest).map_err(|e| format!("アーカイブ失敗: {e}"))?;
             Ok("アーカイブ完了".into())
         })
@@ -546,8 +559,8 @@ pub async fn delete_mail(config: &AccountConfig, folder: &str, uid: u32) -> Resu
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            let dest = resolve_folder("TRASH");
-            session.select(resolve_folder(&folder)).map_err(|e| format!("{e}"))?;
+            let dest = resolve_folder(&config.email, "TRASH");
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("{e}"))?;
             session.uid_mv(uid.to_string(), &dest).map_err(|e| format!("削除失敗: {e}"))?;
             Ok("削除完了".into())
         })
@@ -559,7 +572,7 @@ pub async fn toggle_star(config: &AccountConfig, folder: &str, uid: u32, add: bo
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            session.select(resolve_folder(&folder)).map_err(|e| format!("{e}"))?;
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("{e}"))?;
             if add {
                 session.uid_store(uid.to_string(), "+FLAGS (\\Flagged)").map_err(|e| format!("{e}"))?;
             } else {
@@ -593,7 +606,7 @@ pub async fn fetch_thread(config: &AccountConfig, folder: &str, subject: &str) -
     let subject = subject.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            session.select(resolve_folder(&folder)).map_err(|e| format!("{e}"))?;
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("{e}"))?;
             let clean_subject = subject.trim_start_matches("Re: ").trim_start_matches("Fwd: ");
             let query = format!("SUBJECT \"{}\"", clean_subject.replace('"', "\\\""));
             let uids = session.uid_search(&query).map_err(|e| format!("検索失敗: {e}"))?;
@@ -643,7 +656,7 @@ async fn fetch_attachment_bytes(config: &AccountConfig, folder: &str, uid: u32, 
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_session(&config, |session| {
-            session.select(resolve_folder(&folder)).map_err(|e| format!("{e}"))?;
+            session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("{e}"))?;
             let messages = session.uid_fetch(uid.to_string(), "(UID BODY[])")
                 .map_err(|e| format!("{e}"))?;
             let msg = messages.iter().next().ok_or("メールが見つかりません".to_string())?;

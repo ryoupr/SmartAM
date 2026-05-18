@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
+  import type { DetectedCalendarEvent } from '$lib/types';
 
   let { mailBody, llmConfig, calendarName = '仕事', calendarNames = [], provider = 'apple', accessToken = '', onClose }: {
     mailBody: string;
@@ -12,27 +13,25 @@
     onClose: () => void;
   } = $props();
 
-  type CalEvent = { title: string; start: string; end: string; location: string };
-
-  let events: CalEvent[] = $state([]);
+  let events: DetectedCalendarEvent[] = $state([]);
   let loading = $state(true);
-  let registering = $state(false);
+  let registering: Set<number> = $state(new Set());
   let toast = $state('');
   let calName = $state(calendarName);
 
   onMount(() => {
-    invoke<CalEvent[]>('detect_calendar_events', { llm: llmConfig, mailBody })
+    invoke<DetectedCalendarEvent[]>('detect_calendar_events', { llm: llmConfig, mailBody })
       .then(r => { events = r; loading = false; })
       .catch(() => { loading = false; });
   });
 
-  async function register(ev: CalEvent) {
-    registering = true;
+  async function register(ev: DetectedCalendarEvent, i: number) {
+    registering.add(i); registering = new Set(registering);
     try {
       await invoke('register_calendar_event', { event: ev, calendarName: calName, provider, accessToken });
       toast = '✅ カレンダーに登録しました';
     } catch (e) { toast = `❌ ${e}`; }
-    finally { registering = false; }
+    finally { registering.delete(i); registering = new Set(registering); }
   }
 </script>
 
@@ -63,7 +62,7 @@
               <input bind:value={calName} class="cal-input" />
             {/if}
           </label>
-          <button class="btn-register" disabled={registering} onclick={() => register(ev)}>登録する</button>
+          <button class="btn-register" disabled={registering.has(i)} onclick={() => register(ev, i)}>登録する</button>
         </div>
       </div>
     {/each}

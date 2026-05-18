@@ -90,7 +90,7 @@ pub fn check_budget() -> Result<(), String> {
     let limit = BUDGET_LIMIT.load(std::sync::atomic::Ordering::Relaxed);
     if limit == 0 { return Ok(()); } // No limit set
 
-    let store = USAGE.lock().unwrap();
+    let store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
     let month = current_month();
     let cost = store.monthly.get(&month).map(|m| m.total_cost_microcents).unwrap_or(0);
     if cost >= limit * 10000 {
@@ -106,7 +106,7 @@ pub fn record_usage(model: &str, input_tokens: u64, output_tokens: u64) {
         + output_tokens as f64 / 1000.0 * pricing.output_per_1k;
     let cost_microcents = (cost_usd * 1_000_000.0) as u64; // 1 USD = 1,000,000 microcents
 
-    let mut store = USAGE.lock().unwrap();
+    let mut store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
     let month = current_month();
     let monthly = store.monthly.entry(month).or_default();
     let model_usage = monthly.models.entry(model.to_string()).or_default();
@@ -130,7 +130,7 @@ pub fn record_usage(model: &str, input_tokens: u64, output_tokens: u64) {
 }
 
 pub fn get_summary() -> UsageSummary {
-    let store = USAGE.lock().unwrap();
+    let store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
     let month = current_month();
     let limit = BUDGET_LIMIT.load(std::sync::atomic::Ordering::Relaxed) as f64 / 100.0;
 
@@ -166,7 +166,7 @@ pub fn get_available_months() -> Vec<String> {
 }
 
 pub fn get_summary_for_month(month: &str) -> UsageSummary {
-    let store = USAGE.lock().unwrap();
+    let store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
     let limit = BUDGET_LIMIT.load(std::sync::atomic::Ordering::Relaxed) as f64 / 100.0;
     let monthly = store.monthly.get(month);
     let total_cost = monthly.map(|m| m.total_cost_microcents as f64 / 1_000_000.0).unwrap_or(0.0);
@@ -191,7 +191,7 @@ pub fn get_summary_for_month(month: &str) -> UsageSummary {
 }
 
 fn get_pricing(model: &str) -> ModelPricing {
-    let cache = PRICING.lock().unwrap();
+    let cache = PRICING.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(p) = cache.get(model) {
         return p.clone();
     }
@@ -307,7 +307,7 @@ pub async fn fetch_pricing() {
         }
     }
 
-    let mut cache = PRICING.lock().unwrap();
+    let mut cache = PRICING.lock().unwrap_or_else(|e| e.into_inner());
     for (model, (input, output)) in pricing_map {
         if let (Some(i), Some(o)) = (input, output) {
             cache.insert(model, ModelPricing { input_per_1k: i, output_per_1k: o });
