@@ -194,9 +194,13 @@ async fn send_mail_with_attachments(config: SmtpConfig, to: Vec<String>, cc: Vec
 #[tauri::command]
 async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<String>, String> {
     trace::trace("CMD", "list_bedrock_models");
-    let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models?byInferenceType=ON_DEMAND");
+    if !regex::Regex::new(r"^[a-z0-9-]+$").unwrap().is_match(&region) {
+        return Err("不正なリージョン名です".into());
+    }
+    let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");
     let client = reqwest::Client::new();
     let resp = client.get(&url)
+        .query(&[("byInferenceType", "ON_DEMAND")])
         .header("Authorization", format!("Bearer {api_key}"))
         .send().await.map_err(|e| format!("{e}"))?;
     if !resp.status().is_success() {
@@ -335,11 +339,9 @@ async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEv
 async fn check_calendar_conflicts(access_token: String, time_min: String, time_max: String, exclude_uid: String) -> Result<Vec<String>, String> {
     trace::trace("CMD", &format!("check_calendar_conflicts: {} ~ {}", time_min, time_max));
     let client = reqwest::Client::new();
-    let url = format!(
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin={}&timeMax={}&singleEvents=true&orderBy=startTime",
-        time_min, time_max
-    );
-    let resp = client.get(&url).bearer_auth(&access_token)
+    let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+        .query(&[("timeMin", &time_min), ("timeMax", &time_max), ("singleEvents", &"true".to_string()), ("orderBy", &"startTime".to_string())])
+        .bearer_auth(&access_token)
         .send().await.map_err(|e| format!("{e}"))?;
     if !resp.status().is_success() { return Ok(vec![]); }
 
@@ -370,11 +372,9 @@ async fn check_calendar_conflicts(access_token: String, time_min: String, time_m
 #[tauri::command]
 async fn get_calendar_event_status(access_token: String, ics_uid: String, my_email: String) -> Result<String, String> {
     let client = reqwest::Client::new();
-    let url = format!(
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events?iCalUID={}",
-        ics_uid
-    );
-    let resp = client.get(&url).bearer_auth(&access_token)
+    let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+        .query(&[("iCalUID", &ics_uid)])
+        .bearer_auth(&access_token)
         .send().await.map_err(|e| format!("{e}"))?;
     if !resp.status().is_success() { return Ok("unknown".into()); }
 
@@ -402,11 +402,9 @@ async fn respond_google_calendar_invite(access_token: String, ics_uid: String, m
     let client = reqwest::Client::new();
 
     // 1. iCalUID でイベントを検索
-    let url = format!(
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events?iCalUID={}",
-        ics_uid
-    );
-    let resp = client.get(&url).bearer_auth(&access_token)
+    let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+        .query(&[("iCalUID", &ics_uid)])
+        .bearer_auth(&access_token)
         .send().await.map_err(|e| format!("{e}"))?;
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();

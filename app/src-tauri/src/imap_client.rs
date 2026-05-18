@@ -73,7 +73,7 @@ static ICS_CACHE: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mu
 
 pub fn set_cache_max(max: usize) {
     CACHE_MAX.store(max, Ordering::Relaxed);
-    let mut cache = CACHE.lock().unwrap();
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.evict(max);
     crate::trace::trace("IMAP", &format!("cache max set to {}, bytes: {}KB", max, cache.estimated_bytes / 1024));
 }
@@ -81,7 +81,7 @@ pub fn set_cache_max(max: usize) {
 static FOLDER_MAP: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn resolve_folder(folder: &str) -> String {
-    let map = FOLDER_MAP.lock().unwrap();
+    let map = FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner());
     map.get(folder).cloned().unwrap_or_else(|| folder.to_string())
 }
 
@@ -90,18 +90,24 @@ fn discover_folders(session: &mut ImapSession) -> Result<(), String> {
     let folders = session.list(Some(""), Some("*"))
         .map_err(|e| format!("フォルダ一覧取得失敗: {e}"))?;
 
-    let mut map = FOLDER_MAP.lock().unwrap();
+    let mut map = FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner());
     map.insert("INBOX".to_string(), "INBOX".to_string());
 
     for f in folders.iter() {
         let name = f.name().to_string();
-        let attrs = format!("{:?}", f.attributes());
-        if attrs.contains("All") { map.insert("ALL".to_string(), name.clone()); map.insert("STARRED".to_string(), name.clone()); }
-        if attrs.contains("Sent") { map.insert("SENT".to_string(), name.clone()); }
-        if attrs.contains("Drafts") { map.insert("DRAFTS".to_string(), name.clone()); }
-        if attrs.contains("Junk") { map.insert("SPAM".to_string(), name.clone()); }
-        if attrs.contains("Trash") { map.insert("TRASH".to_string(), name.clone()); }
-        if attrs.contains("Flagged") { /* STARRED already mapped to All */ }
+        // imap crate NameAttribute: NoInferiors, NoSelect, Marked, Unmarked, Custom(Cow<str>)
+        // Gmail special-use attributes (e.g. \All, \Sent) are stored as Custom("\\All") etc.
+        let has_attr = |target: &str| -> bool {
+            f.attributes().iter().any(|a| match a {
+                imap::types::NameAttribute::Custom(cow) => cow.eq_ignore_ascii_case(target),
+                _ => false,
+            })
+        };
+        if has_attr("\\All") { map.insert("ALL".to_string(), name.clone()); map.insert("STARRED".to_string(), name.clone()); }
+        if has_attr("\\Sent") { map.insert("SENT".to_string(), name.clone()); }
+        if has_attr("\\Drafts") { map.insert("DRAFTS".to_string(), name.clone()); }
+        if has_attr("\\Junk") { map.insert("SPAM".to_string(), name.clone()); }
+        if has_attr("\\Trash") { map.insert("TRASH".to_string(), name.clone()); }
     }
 
     crate::trace::trace("IMAP", &format!("discover_folders: {:?}", *map));
@@ -151,7 +157,7 @@ where
     F: FnOnce(&mut ImapSession) -> Result<R, String>,
 {
     let key = config.email.clone();
-    let existing = POOL.lock().unwrap().remove(&key);
+    let existing = POOL.lock().unwrap_or_else(|e| e.into_inner()).remove(&key);
 
     let mut session = match existing {
         Some(mut s) => {
@@ -166,7 +172,7 @@ where
         None => {
             crate::trace::trace("IMAP", "pool: new connection");
             let mut s = connect_sync(config)?;
-            if FOLDER_MAP.lock().unwrap().is_empty() {
+            if FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
                 let _ = discover_folders(&mut s);
             }
             s
@@ -175,8 +181,9 @@ where
 
     let result = f(&mut session);
 
-    if result.is_ok() {
-        POOL.lock().unwrap().insert(key, session);
+    // Return session to pool if still healthy (even on Err result)
+    if result.is_ok() || session.noop().is_ok() {
+        POOL.lock().unwrap_or_else(|e| e.into_inner()).insert(key, session);
     }
 
     result
@@ -423,7 +430,7 @@ fn parse_mail_detail(uid: u32, msg: &imap::types::Fetch) -> Result<MailDetail, S
 
 pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Result<MailDetail, String> {
     // Check cache first
-    if let Some(detail) = CACHE.lock().unwrap().get(&uid) {
+    if let Some(detail) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&uid) {
         crate::trace::trace("IMAP", &format!("fetch_detail uid={}: cache HIT", uid));
         return Ok(detail.clone());
     }
@@ -437,7 +444,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
                 .map_err(|e| format!("メール取得失敗: {e}"))?;
             let msg = messages.iter().next().ok_or("メールが見つかりません".to_string())?;
             let detail = parse_mail_detail(uid, &msg)?;
-            CACHE.lock().unwrap().insert(uid, detail.clone());
+            CACHE.lock().unwrap_or_else(|e| e.into_inner()).insert(uid, detail.clone());
             crate::trace::trace("IMAP", &format!("fetch_detail uid={}: fetched & cached", uid));
             Ok(detail)
         })
@@ -447,7 +454,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
 pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>) -> Result<u32, String> {
     // Filter out already cached UIDs
     let uncached: Vec<u32> = {
-        let cache = CACHE.lock().unwrap();
+        let cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
         uids.into_iter().filter(|uid| !cache.contains_key(uid)).collect()
     };
     if uncached.is_empty() {
@@ -467,12 +474,15 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                 .map_err(|e| format!("プリロード失敗: {e}"))?;
 
             let mut count = 0u32;
-            let mut cache = CACHE.lock().unwrap();
+            // Collect ICS data outside CACHE lock to avoid deadlock
+            let mut ics_entries: Vec<(String, String)> = Vec::new();
+            let mut details_to_cache: Vec<(u32, MailDetail)> = Vec::new();
+
             for msg in messages.iter() {
                 let uid = msg.uid.unwrap_or(0);
                 if uid == 0 { continue; }
                 if let Ok(detail) = parse_mail_detail(uid, &msg) {
-                    // Pre-cache ICS attachment data
+                    // Collect ICS attachment data
                     if detail.attachments.iter().any(|a| a.filename.ends_with(".ics")) {
                         if let Some(body_raw) = msg.body() {
                             if let Ok(parsed) = mailparse::parse_mail(body_raw) {
@@ -482,7 +492,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                                             if let Ok(data) = part.get_body_raw() {
                                                 let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
                                                 let key = format!("{}:{}", uid, att.index);
-                                                ICS_CACHE.lock().unwrap().insert(key, b64);
+                                                ics_entries.push((key, b64));
                                             }
                                         }
                                     }
@@ -490,10 +500,27 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                             }
                         }
                     }
-                    cache.insert(uid, detail);
+                    details_to_cache.push((uid, detail));
                     count += 1;
                 }
             }
+
+            // Insert into CACHE
+            {
+                let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                for (uid, detail) in details_to_cache {
+                    cache.insert(uid, detail);
+                }
+            }
+
+            // Insert into ICS_CACHE after CACHE lock is released
+            if !ics_entries.is_empty() {
+                let mut ics_cache = ICS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                for (key, b64) in ics_entries {
+                    ics_cache.insert(key, b64);
+                }
+            }
+
             crate::trace::trace("IMAP", &format!("preload: cached {} mails", count));
             Ok(count)
         })
@@ -602,7 +629,7 @@ pub async fn download_attachment(config: &AccountConfig, folder: &str, uid: u32,
 pub async fn fetch_attachment_data(config: &AccountConfig, folder: &str, uid: u32, part_index: usize) -> Result<String, String> {
     // Check ICS cache first
     let cache_key = format!("{}:{}", uid, part_index);
-    if let Some(b64) = ICS_CACHE.lock().unwrap().get(&cache_key) {
+    if let Some(b64) = ICS_CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&cache_key) {
         crate::trace::trace("IMAP", &format!("fetch_attachment uid={}:{}: ICS cache HIT", uid, part_index));
         return Ok(b64.clone());
     }

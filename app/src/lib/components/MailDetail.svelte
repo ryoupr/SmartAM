@@ -40,6 +40,8 @@
   let iframeHeight = $state(200);
 
   // Reset panels when mail changes
+  $effect(() => { if (mail) starred = (mail as any).starred ?? false; });
+
   $effect(() => {
     const uid = mail?.uid ?? null;
     if (uid !== prevUid) {
@@ -87,6 +89,7 @@
 
   $effect(() => {
     if (!iframeEl) return;
+    const controller = new AbortController();
     const adjustHeight = () => {
       try {
         const doc = iframeEl!.contentDocument;
@@ -100,12 +103,12 @@
               e.preventDefault();
               invoke('open_external_url', { url: href }).catch(() => {});
             }
-          });
+          }, { signal: controller.signal });
         }
       } catch {}
     };
-    iframeEl.addEventListener('load', adjustHeight);
-    return () => iframeEl?.removeEventListener('load', adjustHeight);
+    iframeEl.addEventListener('load', adjustHeight, { signal: controller.signal });
+    return () => controller.abort();
   });
 
   function buildSrcdoc(html: string): string {
@@ -175,6 +178,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   }
 
   function renderMd(text: string): string {
+    text = text.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
     return text
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')

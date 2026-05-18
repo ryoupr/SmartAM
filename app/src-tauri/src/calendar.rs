@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::LlmConfig;
+use regex::Regex;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CalendarEvent {
@@ -38,6 +39,17 @@ pub async fn register_google_calendar(event: &CalendarEvent, access_token: &str)
 }
 
 pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str) -> Result<String, String> {
+    // Validate datetime fields to prevent AppleScript injection
+    let dt_re = Regex::new(r"^[0-9T:\-+]+$").unwrap();
+    if !dt_re.is_match(&event.start) {
+        return Err(format!("不正な開始日時: {}", event.start));
+    }
+    if !dt_re.is_match(&event.end) {
+        return Err(format!("不正な終了日時: {}", event.end));
+    }
+    // Sanitize calendar_name: remove quotes and newlines
+    let cal_name = calendar_name.replace('"', "").replace('\n', "").replace('\r', "");
+
     let script = format!(
         r#"tell application "Calendar"
     tell calendar "{cal}"
@@ -58,7 +70,7 @@ pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str)
         end if
     end tell
 end tell"#,
-        cal = calendar_name,
+        cal = cal_name,
         title = event.title.replace('"', "\\\""),
         start = &event.start,
         end = &event.end,
@@ -72,7 +84,10 @@ end tell"#,
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(script.as_bytes())?;
+            let stdin = child.stdin.take().ok_or(std::io::Error::new(std::io::ErrorKind::Other, "stdin unavailable"))?;
+            let mut stdin = stdin;
+            stdin.write_all(script.as_bytes())?;
+            drop(stdin);
             child.wait_with_output()
         })
         .map_err(|e| format!("osascript実行失敗: {e}"))?;

@@ -63,7 +63,9 @@
     await ensureValidToken();
     try {
       const folder = activeFolder;
-      searchResults = await invoke<MailSummary[]>('search_mails', { config: getImapConfig(a), folder, query: q, limit: 100 });
+      const results = await invoke<MailSummary[]>('search_mails', { config: getImapConfig(a), folder, query: q, limit: 100 });
+      if (searchQuery !== q) return;
+      searchResults = results;
     } catch (e) { trace('SEARCH', `error: ${e}`); searchResults = null; }
     finally { searching = false; }
   }
@@ -141,6 +143,8 @@
 
   onDestroy(() => {
     if (pollTimer) clearInterval(pollTimer);
+    if (gTimer) clearTimeout(gTimer);
+    if (searchTimer) clearTimeout(searchTimer);
     document.removeEventListener('click', handleLinkClick);
   });
 
@@ -272,6 +276,7 @@
         .then(names => {
           calendarNames = names;
           if (names.length > 0 && !a.calendar?.calendarName) {
+            if (!a.calendar) return;
             a.calendar.calendarName = names[0];
           }
         })
@@ -307,7 +312,9 @@
     selectedUid = uid;
     const folder = activeFolder;
     try {
-      selectedMail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder, uid });
+      const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder, uid });
+      if (selectedUid !== uid) return;
+      selectedMail = detail;
       const m = mails.find(x => x.uid === uid);
       if (m && !m.seen) { m.seen = true; mails = mails; }
       const t2 = performance.now();
@@ -337,14 +344,18 @@
     mails = mails.filter(m => m.uid !== uid);
     const next = mails[idx] ?? mails[idx - 1];
     if (next) { handleSelect(next.uid); } else { selectedMail = null; selectedUid = null; }
-    showToast('📦 アーカイブしました', () => { mails = prevMails; handleSelect(uid); });
 
     // Fire-and-forget IMAP with retry
+    let aborted = false;
+    showToast('📦 アーカイブしました', () => { aborted = true; mails = prevMails; handleSelect(uid); });
+
     const doArchive = async (attempt: number) => {
+      if (aborted) return;
       try {
         await ensureValidToken();
         await invoke('archive_mail', { config: getImapConfig(a), folder: activeFolder, uid });
       } catch (e) {
+        if (aborted) return;
         if (attempt < 10) { setTimeout(() => doArchive(attempt + 1), 1000 * attempt); }
         else { mails = prevMails; handleSelect(uid); error = 'アーカイブ失敗: ' + String(e); }
       }
@@ -381,7 +392,8 @@
     for (const uid of uids) {
       try { await invoke('delete_mail', { config: getImapConfig(a), folder: activeFolder, uid }); } catch {}
     }
-    mails = mails.filter(m => !new Set(uids).has(m.uid));
+    const uidSet = new Set(uids);
+    mails = mails.filter(m => !uidSet.has(m.uid));
     selectedMail = null; selectedUid = null; selectedUids = new Set();
     showToast(`🗑 ${uids.length}件削除しました`);
   }
