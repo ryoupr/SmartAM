@@ -1,11 +1,13 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
 
-  let { mailBody, llmConfig, calendarName = '仕事', calendarNames = [], onClose }: {
+  let { mailBody, llmConfig, calendarName = '仕事', calendarNames = [], provider = 'apple', accessToken = '', onClose }: {
     mailBody: string;
     llmConfig: { base_url: string; model: string; api_key: string };
     calendarName?: string;
     calendarNames?: string[];
+    provider?: string;
+    accessToken?: string;
     onClose: () => void;
   } = $props();
 
@@ -26,7 +28,7 @@
   async function register(ev: CalEvent) {
     registering = true;
     try {
-      await invoke('register_calendar_event', { event: ev, calendarName: calName });
+      await invoke('register_calendar_event', { event: ev, calendarName: calName, provider, accessToken });
       toast = '✅ カレンダーに登録しました';
     } catch (e) { toast = `❌ ${e}`; }
     finally { registering = false; }

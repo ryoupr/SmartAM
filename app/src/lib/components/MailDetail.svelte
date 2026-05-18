@@ -7,7 +7,7 @@
   import type { MailDetail, Attachment, CalendarEvent } from '$lib/types';
   import { formatMailDate } from '$lib/store';
 
-  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [], dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
+  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [], calendarProvider = 'apple', dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
     mail: MailDetail | null;
     onArchive: () => void;
     onDelete: () => void;
@@ -21,6 +21,7 @@
     smtpConfig?: { email: string; auth_type: string; password: string; access_token: string; smtp_host: string; smtp_port: number } | null;
     calendarName?: string;
     calendarNames?: string[];
+    calendarProvider?: string;
     dateFormat?: string;
     timezone?: string;
   } = $props();
@@ -223,7 +224,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
     {/if}
     {#if openPanels.has('calendar')}
       <div transition:slide={{ duration: 150 }}>
-        <CalendarPanel mailBody={getMailText()} {llmConfig} {calendarName} {calendarNames} onClose={() => togglePanel('calendar')} />
+        <CalendarPanel mailBody={getMailText()} {llmConfig} {calendarName} {calendarNames} provider={calendarProvider} accessToken={smtpConfig?.access_token ?? ''} onClose={() => togglePanel('calendar')} />
       </div>
     {/if}
 

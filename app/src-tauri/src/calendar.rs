@@ -17,6 +17,26 @@ pub async fn detect_events(llm: &LlmConfig, mail_body: &str) -> Result<Vec<Calen
     serde_json::from_str(&raw[start..end]).map_err(|e| format!("JSON解析失敗: {e}"))
 }
 
+pub async fn register_google_calendar(event: &CalendarEvent, access_token: &str) -> Result<String, String> {
+    let body = serde_json::json!({
+        "summary": event.title,
+        "location": event.location,
+        "start": { "dateTime": &event.start, "timeZone": "Asia/Tokyo" },
+        "end": { "dateTime": &event.end, "timeZone": "Asia/Tokyo" },
+    });
+    let client = reqwest::Client::new();
+    let resp = client.post("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+        .bearer_auth(access_token)
+        .json(&body)
+        .send().await.map_err(|e| format!("{e}"))?;
+    if resp.status().is_success() {
+        Ok("カレンダーに登録しました".into())
+    } else {
+        let err = resp.text().await.unwrap_or_default();
+        Err(format!("Google Calendar登録失敗: {err}"))
+    }
+}
+
 pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str) -> Result<String, String> {
     let script = format!(
         r#"tell application "Calendar"

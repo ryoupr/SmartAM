@@ -303,9 +303,15 @@ async fn detect_calendar_events(llm: LlmConfig, mail_body: String) -> Result<Vec
 }
 
 #[tauri::command]
-async fn register_calendar_event(event: calendar::CalendarEvent, calendar_name: String) -> Result<String, String> {
-    trace::trace("CMD", &format!("register_calendar_event: {}", event.title));
-    calendar::register_apple_calendar(&event, &calendar_name).await
+async fn register_calendar_event(event: calendar::CalendarEvent, calendar_name: String, provider: Option<String>, access_token: Option<String>) -> Result<String, String> {
+    trace::trace("CMD", &format!("register_calendar_event: {} (provider={:?})", event.title, provider));
+    match provider.as_deref() {
+        Some("google") => {
+            let token = access_token.ok_or("access_token が必要です")?;
+            calendar::register_google_calendar(&event, &token).await
+        }
+        _ => calendar::register_apple_calendar(&event, &calendar_name).await,
+    }
 }
 
 // ICS parsing
