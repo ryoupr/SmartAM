@@ -91,38 +91,40 @@
 
   $effect(() => {
     if (!iframeEl) return;
-    const controller = new AbortController();
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'link-click' && typeof e.data.href === 'string') {
+        const href = e.data.href;
+        if (href.startsWith('http://') || href.startsWith('https://')) {
+          invoke('open_external_url', { url: href }).catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
     const adjustHeight = () => {
       try {
         const doc = iframeEl!.contentDocument;
-        if (doc?.body) {
-          iframeHeight = doc.body.scrollHeight + 16;
-          doc.addEventListener('click', (e: MouseEvent) => {
-            const a = (e.target as HTMLElement)?.closest('a[href]') as HTMLAnchorElement | null;
-            if (!a) return;
-            const href = a.getAttribute('href');
-            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-              e.preventDefault();
-              invoke('open_external_url', { url: href }).catch(() => {});
-            }
-          }, { signal: controller.signal });
-        }
+        if (doc?.body) { iframeHeight = doc.body.scrollHeight + 16; }
       } catch {}
     };
-    iframeEl.addEventListener('load', adjustHeight, { signal: controller.signal });
-    return () => controller.abort();
+    iframeEl.addEventListener('load', adjustHeight);
+    return () => { window.removeEventListener('message', handleMessage); iframeEl?.removeEventListener('load', adjustHeight); };
   });
 
+  function sanitizeHtml(html: string): string {
+    return html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '').replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+  }
+
   function buildSrcdoc(html: string): string {
-    return `<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none'"><base target="_blank"><style>
+    const safe = sanitizeHtml(html);
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; script-src 'unsafe-inline'"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
 img{max-width:100%;height:auto}
 table{border-collapse:collapse;max-width:100%;width:100%}
 td,th{padding:4px 8px;word-break:break-word}
-a{color:#1e66f5}
+a{color:#1e66f5;cursor:pointer}
 blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 *{max-width:100%;box-sizing:border-box}
-</style></head><body>${html}</body></html>`;
+</style><script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});<\/script></head><body>${safe}</body></html>`;
   }
 
   function linkifyText(text: string): string {
@@ -139,9 +141,9 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
     if (!mail) return '';
     if (mail.body_text.trim()) return mail.body_text;
     // Fallback: strip HTML tags from body_html
-    const div = document.createElement('div');
-    div.innerHTML = mail.body_html;
-    return div.textContent || div.innerText || '';
+    if (typeof DOMParser === 'undefined') return mail.body_html.replace(/<[^>]*>/g, '');
+    const doc = new DOMParser().parseFromString(mail.body_html, 'text/html');
+    return doc.body.textContent || '';
   }
   async function translateInline() {
     if (translatedBody !== null) { translatedBody = null; return; }
@@ -266,12 +268,12 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-same-origin allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-same-origin allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
     {:else if mail.body_text.trim()}
       <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
