@@ -62,8 +62,15 @@
             icsEvents = evts;
             if (smtpConfig?.auth_type === 'oauth') {
               const toRfc = (s: string) => {
-                const m = s.replace(/[^0-9T]/g, '').match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/);
-                return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]||'00'}Z` : s;
+                // Already RFC3339 format
+                if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s) ? s : s + '+09:00';
+                // ICS format: 20260612T193000Z or 20260612T193000
+                const isUtc = s.endsWith('Z');
+                const digits = s.replace(/[^0-9T]/g, '');
+                const m = digits.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/);
+                if (!m) return s;
+                const base = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]||'00'}`;
+                return isUtc ? base + 'Z' : base + '+09:00';
               };
               for (let i = 0; i < icsEvents.length; i++) {
                 const ev = icsEvents[i];

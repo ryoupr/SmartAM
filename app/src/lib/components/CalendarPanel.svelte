@@ -18,10 +18,24 @@
   let registering: Set<number> = $state(new Set());
   let toast = $state('');
   let calName = $state(calendarName);
+  let conflicts: Record<number, string[]> = $state({});
 
   onMount(() => {
     invoke<DetectedCalendarEvent[]>('detect_calendar_events', { llm: llmConfig, mailBody })
-      .then(r => { events = r; loading = false; })
+      .then(async r => {
+        events = r; loading = false;
+        if (provider === 'google' && accessToken) {
+          for (let i = 0; i < r.length; i++) {
+            try {
+              const c = await invoke<string[]>('check_calendar_conflicts', {
+                accessToken, timeMin: r[i].start, timeMax: r[i].end, excludeUid: ''
+              });
+              if (c.length > 0) conflicts[i] = c;
+            } catch {}
+          }
+          conflicts = { ...conflicts };
+        }
+      })
       .catch(() => { loading = false; });
   });
 
@@ -51,6 +65,9 @@
           <input class="ev-input" bind:value={ev.end} />
         </div>
         <input class="ev-input" bind:value={ev.location} placeholder="場所（任意）" />
+        {#if conflicts[i]?.length}
+          <div class="ev-conflict">⚠️ 同時間帯に {conflicts[i].length} 件の予定: {conflicts[i].join(', ')}</div>
+        {/if}
         <div class="event-actions">
           <label class="cal-select">
             登録先:
@@ -89,4 +106,5 @@
   .btn-register { padding:6px 16px;border-radius:6px;border:none;background:#1e66f5;color:#fff;font-weight:700;font-size:11px;cursor:pointer }
   .btn-register:disabled { opacity:.6 }
   .toast { margin-top:8px;padding:6px 12px;border-radius:6px;background:#1e3a2e;color:var(--green);font-size:11px }
+  .ev-conflict { font-size:10px;color:var(--yellow);background:rgba(249,226,175,0.1);border:1px solid var(--yellow);border-radius:4px;padding:6px 8px;margin:4px 0 }
 </style>
