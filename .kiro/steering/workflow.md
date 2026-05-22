@@ -23,3 +23,9 @@ develop → feature/xxx → PR → develop → (リリース時) → main + tag
 4. commit → push → PR（base: `develop`）→ マージ
 5. feature ブランチを削除
 6. `git checkout develop && git pull origin develop`
+
+## ⚠ 必須ルール
+
+- **git 操作（commit, merge, push, tag）を行う前に、必ず本ファイルと `release.md` を参照すること**
+- ローカルで `main` に直接マージしない — PR 経由でマージする
+- リリース時は `release.md` の手順を厳密に順守する（署名付きビルド + アセット添付）

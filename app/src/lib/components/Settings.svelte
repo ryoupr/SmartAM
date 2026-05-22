@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { getVersion } from '@tauri-apps/api/app';
   import { type AppSettings } from '$lib/store';
   import AccountTab from './settings/AccountTab.svelte';
   import LlmTab from './settings/LlmTab.svelte';
@@ -15,6 +16,8 @@
   let local: AppSettings = $state(JSON.parse(JSON.stringify(settings)));
   let activeTab = $state('account');
   let saveToast = $state(false);
+  let appVersion = $state('');
+  getVersion().then(v => appVersion = v).catch(() => {});
 
   const globalTabs = [
     { id: 'account', label: 'メールアカウント' },
@@ -83,7 +86,7 @@
             <div class="about-logo"><span class="chi-mark"><span class="chi">智</span><span class="chi-bar"></span></span></div>
             <div class="about-name">Smart<span class="am">AM</span></div>
             <div class="about-desc">AI-native Desktop Mail Client</div>
-            <div class="about-ver">v0.1.10</div>
+            <div class="about-ver">v{appVersion || '...'}</div>
             <div class="about-info">
               <div>Platform: macOS (Tauri v2)</div>
               <div>Frontend: SvelteKit + TypeScript</div>
