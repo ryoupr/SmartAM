@@ -18,19 +18,34 @@
     onMultiSelect?: (uids: Set<number>) => void;
   } = $props();
 
+  const ITEM_HEIGHT = 50;
+  const OVERSCAN = 5;
+
   let listEl: HTMLDivElement | undefined = $state(undefined);
+  let scrollTop = $state(0);
+  let clientHeight = $state(600);
+
+  let visibleStart = $derived(Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN));
+  let visibleEnd = $derived(Math.min(mails.length, Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + OVERSCAN));
+  let visibleMails = $derived(mails.slice(visibleStart, visibleEnd));
+  let totalHeight = $derived(mails.length * ITEM_HEIGHT);
+  let offsetY = $derived(visibleStart * ITEM_HEIGHT);
 
   $effect(() => {
     if (!selectedUid || !listEl) return;
-    const btn = listEl.querySelector(`[data-uid="${selectedUid}"]`) as HTMLElement | null;
-    if (btn) { btn.focus({ preventScroll: false }); btn.scrollIntoView({ block: 'nearest' }); }
+    const idx = mails.findIndex(m => m.uid === selectedUid);
+    if (idx >= 0) {
+      const itemTop = idx * ITEM_HEIGHT;
+      if (itemTop < scrollTop || itemTop + ITEM_HEIGHT > scrollTop + clientHeight) {
+        listEl.scrollTop = itemTop - clientHeight / 2 + ITEM_HEIGHT / 2;
+      }
+    }
   });
 
   let lastClickedUid: number | null = $state(null);
 
   function handleClick(uid: number, e: MouseEvent) {
     if (e.shiftKey && lastClickedUid !== null) {
-      // Range select
       const startIdx = mails.findIndex(m => m.uid === lastClickedUid);
       const endIdx = mails.findIndex(m => m.uid === uid);
       if (startIdx >= 0 && endIdx >= 0) {
@@ -41,13 +56,11 @@
         onMultiSelect?.(selectedUids);
       }
     } else if (e.ctrlKey || e.metaKey) {
-      // Toggle select
       const next = new Set(selectedUids);
       if (next.has(uid)) next.delete(uid); else next.add(uid);
       selectedUids = next;
       onMultiSelect?.(selectedUids);
     } else {
-      // Normal click: clear multi-select, select single
       selectedUids = new Set();
       onSelect(uid);
     }
@@ -56,10 +69,11 @@
 
   function handleScroll(e: Event) {
     const el = e.target as HTMLElement;
-    const itemHeight = 50;
+    scrollTop = el.scrollTop;
+    clientHeight = el.clientHeight;
+    // Infinite scroll: load more when near bottom
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const remainingItems = remaining / itemHeight;
-    if (remainingItems < pageSize / 2 && !loadingMore && !loading && onLoadMore) {
+    if (remaining < ITEM_HEIGHT * 10 && !loadingMore && !loading && onLoadMore) {
       onLoadMore();
     }
   }
@@ -75,17 +89,21 @@
   {#if loading}
     <div class="empty">読み込み中...</div>
   {:else}
-    {#each mails as mail}
-      <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
-        <div class="mail-header">
-          <span class="from">{mail.from}</span>
-          <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
-        </div>
-        <div class="subject">{mail.subject}</div>
-      </button>
-    {:else}
-      <div class="empty">メールがありません</div>
-    {/each}
+    <div class="virtual-container" style:height="{totalHeight}px">
+      <div class="virtual-offset" style:transform="translateY({offsetY}px)">
+        {#each visibleMails as mail}
+          <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
+            <div class="mail-header">
+              <span class="from">{mail.from}</span>
+              <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
+            </div>
+            <div class="subject">{mail.subject}</div>
+          </button>
+        {:else}
+          <div class="empty">メールがありません</div>
+        {/each}
+      </div>
+    </div>
     {#if loadingMore}
       <div class="loading-more">読み込み中...</div>
     {/if}
@@ -94,13 +112,15 @@
 
 <style>
   .mail-list { width:290px;min-width:290px;border-right:1px solid var(--surface1);overflow-y:auto;display:flex;flex-direction:column }
-  .search { padding:8px;position:relative }
+  .search { padding:8px;position:relative;flex-shrink:0 }
   .search input { width:100%;padding:6px 28px 6px 10px;border-radius:6px;border:none;background:var(--surface0);color:var(--text);font-size:11px }
   .search input:focus { outline:1px solid var(--mauve) }
   .search input::placeholder { color:var(--overlay) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
-  .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px }
-  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box;outline:none }
+  .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px;flex-shrink:0 }
+  .virtual-container { position:relative;flex:1 }
+  .virtual-offset { position:absolute;left:0;right:0;top:0 }
+  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box;outline:none;width:100%;display:block }
   .mail-item:hover { background:var(--surface0) }
   .mail-item:focus-visible { background:var(--surface0);border-left-color:var(--mauve) }
   .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }

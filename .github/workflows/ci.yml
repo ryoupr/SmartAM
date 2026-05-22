@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install system dependencies (macOS)
+        run: |
+          brew install gtk4  # Tauri v2 macOS build dep (if needed)
+
+      - name: Install frontend dependencies
+        run: cd app && npm ci
+
+      - name: Rust format check
+        run: cd app/src-tauri && cargo fmt -- --check
+
+      - name: Rust clippy
+        run: cd app/src-tauri && cargo clippy -- -D warnings
+
+      - name: Rust tests
+        run: cd app/src-tauri && cargo test
+
+      - name: Svelte check
+        run: cd app && npx svelte-check --tsconfig ./tsconfig.json --fail-on-warnings=false
+
+      - name: Frontend tests
+        run: cd app && npx vitest run --passWithNoTests
