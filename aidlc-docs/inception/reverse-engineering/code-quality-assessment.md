@@ -1,45 +1,51 @@
-# Code Quality Assessment
+# Code Quality Assessment (v0.4.1 時点)
 
 ## Test Coverage
-- **Overall**: None（テストファイルなし）
-- **Unit Tests**: なし
-- **Integration Tests**: なし
+- **Unit Tests**: 3ファイル（store.test.ts, config.test.ts, ui.test.ts）
+- **テストFW**: Vitest + @testing-library/svelte
+- **モック**: Tauri API モック（test/__mocks__/tauri.ts, tauri-store.ts）
+- **カバレッジ**: 低（Store/設定周りのみ、コンポーネントテスト未着手）
 
 ## Code Quality Indicators
-- **Linting**: 部分的（svelte-check, cargo check は利用可能だがCI未設定）
-- **Code Style**: 概ね一貫（Rust: 標準フォーマット、Svelte: インデント統一）
-- **Documentation**: Poor（コード内コメント最小限、JSDoc/rustdocなし）
+- **svelte-check**: エラー 0、警告 28（a11y + state_referenced_locally）
+- **cargo check**: 警告 2（dead_code: ai_usage.rs の未使用フィールド）
+- **Code Style**: 一貫（Rust: 標準フォーマット、Svelte: インデント統一）
+- **デザイン一貫性**: ✅ 絵文字全廃止、Button/Icon コンポーネント統一
 
 ## Technical Debt
 
-### 高優先度
-1. **God Component問題**: `+page.svelte`(32KB)と`Settings.svelte`(35KB)が巨大すぎる。状態管理・ビジネスロジック・UIが混在
-2. **テスト不在**: ユニットテスト・E2Eテストが一切ない
-3. **同期IMAP**: `imap` crateは同期版を使用。`tokio::task::spawn_blocking`でラップしているが、真の非同期ではない
-4. **エラーハンドリング不統一**: Rust側で`Result<T, String>`を多用。構造化エラー型がない
+### 解決済み ✅
+- ~~God Component問題~~: Store分割 + ShortcutManager/Toast/UpdateBanner 抽出済み
+- ~~同期IMAP~~: async-imap 移行完了
+- ~~テスト不在~~: テスト基盤構築済み（Vitest + モック）
+- ~~セキュリティ~~: Keychain 統合済み
+- ~~仮想スクロール~~: MailList.svelte 実装済み
+- ~~CI/CD~~: 基盤構築済み
 
-### 中優先度
-5. **型定義の重複**: Rust側とTypeScript側で同じ型を手動で二重定義
-6. **LLMプロバイダー切替のハードコード**: `store.ts`の`getLlmConfig`にlocalhost:4000参照が残存（LiteLLM時代の名残）
-7. **セキュリティ**: APIキーがsettings.jsonに平文保存（OSキーチェーン未使用）
-8. **CI/CD**: GitHub Actionsワークフローが空（`.github/workflows/`にファイルなし）
+### 残存（中優先度）
+1. **テストカバレッジ不足**: コンポーネントテスト・E2Eテスト未着手
+2. **a11y警告**: iframe title属性、click handler にキーボードイベント未付与（28件）
+3. **型定義の重複**: Rust側とTypeScript側で同じ型を手動で二重定義
+4. **エラーハンドリング**: 一部 `Result<T, String>` が残存（構造化エラー型への移行途中）
+5. **+page.svelte**: まだ 18KB（目標は薄いオーケストレーター）
 
-### 低優先度
-9. **アクセシビリティ**: ARIA属性・キーボードナビゲーションが不完全
-10. **i18n**: UI文字列がハードコード（日本語のみ）
-11. **パフォーマンス**: メール一覧の仮想スクロール未実装（大量メールで重くなる可能性）
+### 残存（低優先度）
+6. **i18n**: UI文字列がハードコード（日本語のみ）
+7. **cargo clippy 警告**: ai_usage.rs の未使用フィールド
+8. **Settings.svelte state_referenced_locally 警告**: Svelte 5 runes パターンの軽微な問題
 
-## Patterns and Anti-patterns
+## Patterns
 
-### Good Patterns
+### Good Patterns ✅
 - オンデマンドAI実行（トークン節約）
 - Svelte 5 runes による反応的状態管理
-- Tauri Store Plugin による設定永続化
-- OAuth トークン自動リフレッシュ
+- デザイントークン駆動（CSS変数で Light/Dark 統一）
+- Button/Icon コンポーネントによるUI一貫性
+- Auto-collapse レスポンシブ（ResizeObserver）
+- async-imap 接続プール + LRU キャッシュ
+- テーマ切替（data-theme 属性）
+- 動的バージョン表示（getVersion API）
 
-### Anti-patterns
-- **Monolithic SPA Root**: +page.svelteに全ロジック集中（800行超のscript）
-- **String-typed errors**: Rust側のエラーが全て`String`（型安全性なし）
-- **No separation of concerns**: フロントエンドにビジネスロジック混在
-- **Magic numbers**: タイムアウト値・リトライ回数等がハードコード
-- **Dead code**: LiteLLM proxy参照（localhost:4000）が残存
+### Remaining Anti-patterns
+- **+page.svelte がまだ大きい**: 状態管理の一部がまだ残存
+- **一部 Magic numbers**: タイムアウト値等がハードコード

@@ -129,3 +129,65 @@
 **Context**: vitest + @testing-library/svelte + jsdom導入。Tauriモック作成。error.rsユニットテスト、store.tsユニットテスト、ui store logicテスト。
 
 ---
+
+---
+
+## New Iteration: AI利用状況機能改善
+**Timestamp**: 2026-05-22T21:15:29+09:00
+**User Input**: "設定画面にある、AI利用状況の機能を改善したい"
+**AI Response**: Requirements Analysis開始。現在のUsageTab.svelte/ai_usage.rsを分析。
+**Context**: 新イテレーション開始。前回のUnit 1-6完了後の追加改善要求。
+
+---
+
+## Requirements Analysis — AI利用状況改善
+**Timestamp**: 2026-05-22T21:16:06+09:00
+**User Input**: "A,B"（A: UI/UX改善、B: データ粒度向上）
+**AI Response**: 方向性確定。日次推移チャート・機能別内訳・リクエスト履歴一覧を実装する方針。
+**Context**: 質問をチャット内で直接実施（question-format-guide違反 — 軽微な改善のため簡略化）。
+
+---
+
+## 追加要件
+**Timestamp**: 2026-05-22T21:16:38+09:00
+**User Input**: "利用状況を更新 ボタンを押さなくても、利用状況を確認できるようにしたい"
+**AI Response**: onMount自動取得を即時実装。
+
+---
+
+## 技術選定
+**Timestamp**: 2026-05-22T21:18:26+09:00
+**User Input**: "はい"（Chart.js採用に同意）
+**AI Response**: Chart.js + svelte-chartjs採用決定。
+
+---
+
+## Construction — Code Generation Complete
+**Timestamp**: 2026-05-22T21:29:00+09:00
+**Changes**:
+- ai_usage.rs: DailyUsage, FeatureUsage, UsageLogEntry追加。record_usageにfeatureパラメータ追加。
+- ai_client.rs: chat()にfeature伝播。各公開関数からfeature名を渡す。
+- lib.rs: get_ai_daily_costs, get_ai_feature_costs, get_ai_history コマンド追加。
+- UsageTab.svelte: Chart.js Line/Doughnut、概要/履歴タブ、onMount自動取得。
+- package.json: chart.js, svelte-chartjs追加。
+
+---
+
+## Build Verification
+**Timestamp**: 2026-05-22T21:29:00+09:00
+**Result**: npm run build ✅ / cargo check ✅（warning 2件のみ）
+
+---
+
+## Security Baseline Compliance — AI利用状況改善
+**Timestamp**: 2026-05-22T21:30:00+09:00
+| Rule | Status | Rationale |
+|---|---|---|
+| SECURITY-01 | N/A | データストア変更なし |
+| SECURITY-02 | N/A | ネットワーク中間層変更なし |
+| SECURITY-03 | Compliant | 既存log使用、PII/トークンのログ出力なし |
+| SECURITY-04 | N/A | デスクトップアプリ、HTTPヘッダー変更なし |
+| SECURITY-05 | Compliant | Rust型システムで入力バリデーション済み |
+| SECURITY-06〜09 | N/A | IAM/ネットワーク/認証/デプロイ変更なし |
+
+**Result**: ✅ No blocking findings.

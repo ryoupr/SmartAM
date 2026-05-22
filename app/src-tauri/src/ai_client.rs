@@ -87,17 +87,35 @@ fn is_bedrock_api_key(config: &LlmConfig) -> bool {
     !config.api_key.is_empty() && config.base_url.contains("bedrock-runtime")
 }
 
-async fn chat(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<String, String> {
+async fn chat(config: &LlmConfig, messages: Vec<ChatMessage>, feature: &str) -> Result<String, String> {
     crate::ai_usage::check_budget()?;
+    validate_base_url(&config.base_url)?;
     if is_bedrock_api_key(config) {
-        bedrock_converse(config, messages).await
+        bedrock_converse(config, messages, feature).await
     } else {
-        openai_chat(config, messages).await
+        openai_chat(config, messages, feature).await
     }
 }
 
-async fn openai_chat(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<String, String> {
-    let client = reqwest::Client::new();
+// [中9] SSRFバリデーション
+fn validate_base_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://localhost") && !url.starts_with("http://127.0.0.1") {
+        return Err("LLM base_url must use HTTPS".into());
+    }
+    Ok(())
+}
+
+// [高2] timeout付きクライアント
+fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
+
+async fn openai_chat(config: &LlmConfig, messages: Vec<ChatMessage>, feature: &str) -> Result<String, String> {
+    let client = http_client();
     let mut req = client
         .post(format!("{}/v1/chat/completions", config.base_url))
         .json(&ChatRequest { model: config.model.clone(), messages });
@@ -112,7 +130,8 @@ async fn openai_chat(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<S
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("LLMエラー ({status}): {body}"));
+        log::error!("LLM error ({status}): {body}");
+        return Err(format!("AI処理に失敗しました（{status}）"));
     }
 
     let data: ChatResponse = resp.json().await.map_err(|e| format!("レスポンス解析失敗: {e}"))?;
@@ -121,6 +140,7 @@ async fn openai_chat(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<S
             &config.model,
             usage.prompt_tokens.unwrap_or(0),
             usage.completion_tokens.unwrap_or(0),
+            feature,
         );
     }
     data.choices.first()
@@ -128,7 +148,7 @@ async fn openai_chat(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<S
         .ok_or("空のレスポンス".into())
 }
 
-async fn bedrock_converse(config: &LlmConfig, messages: Vec<ChatMessage>) -> Result<String, String> {
+async fn bedrock_converse(config: &LlmConfig, messages: Vec<ChatMessage>, feature: &str) -> Result<String, String> {
     // Separate system message from user/assistant messages
     let mut system_blocks = Vec::new();
     let mut converse_msgs = Vec::new();
@@ -147,7 +167,7 @@ async fn bedrock_converse(config: &LlmConfig, messages: Vec<ChatMessage>) -> Res
     }
 
     let url = format!("{}/model/{}/converse", config.base_url, config.model);
-    let client = reqwest::Client::new();
+    let client = http_client();
     let resp = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", config.api_key))
@@ -160,7 +180,8 @@ async fn bedrock_converse(config: &LlmConfig, messages: Vec<ChatMessage>) -> Res
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Bedrockエラー ({status}): {body}"));
+        log::error!("Bedrock error ({status}): {body}");
+        return Err(format!("AI処理に失敗しました（{status}）"));
     }
 
     let data: ConverseResponse = resp.json().await.map_err(|e| format!("レスポンス解析失敗: {e}"))?;
@@ -169,6 +190,7 @@ async fn bedrock_converse(config: &LlmConfig, messages: Vec<ChatMessage>) -> Res
             &config.model,
             usage.input_tokens.unwrap_or(0),
             usage.output_tokens.unwrap_or(0),
+            feature,
         );
     }
     data.output.message.content.first()
@@ -182,7 +204,7 @@ pub async fn raw_chat(llm: &LlmConfig, system: &str, user: &str) -> Result<Strin
         ChatMessage { role: "system".into(), content: system.to_string() },
         ChatMessage { role: "user".into(), content: user.to_string() },
     ];
-    chat(llm, messages).await
+    chat(llm, messages, "other").await
 }
 
 pub async fn summarize(llm: &LlmConfig, mail_body: &str) -> Result<String, String> {
@@ -196,7 +218,7 @@ pub async fn summarize(llm: &LlmConfig, mail_body: &str) -> Result<String, Strin
         ChatMessage { role: "assistant".into(), content: "AirPods Pro (第2世代) を¥39,800で注文済み（注文番号: #A-20260409-1234）。4/12配届け予定、届け先は品川区。配送状況はマイページで確認可能。".into() },
         ChatMessage { role: "user".into(), content: mail_body.to_string() },
     ];
-    chat(llm, messages).await
+    chat(llm, messages, "summarize").await
 }
 
 pub async fn draft_nuances(llm: &LlmConfig, mail_body: &str) -> Result<Vec<crate::Nuance>, String> {
@@ -204,7 +226,7 @@ pub async fn draft_nuances(llm: &LlmConfig, mail_body: &str) -> Result<Vec<crate
         ChatMessage { role: "system".into(), content: "あなたはメール返信アシスタントです。以下のメールを分析し、返答のニュアンスを提案してください。\n\nルール:\n- 送信専用・配信専用・noreplyなど返信不要のメールの場合は [{\"icon\":\"🚫\",\"label\":\"返信不要\",\"description\":\"このメールは送信専用のため返信できません\"}] のみ返す（他の選択肢は不要）\n- 返信可能なメールの場合は最大5個。承諾・辞退・保留・質問・委任などの具体的なニュアンスを提案する\n- 各ニュアンスのdescriptionは具体的に（例:「日程OKと伝える」）\n\nJSON配列で返してください。形式: [{\"icon\":\"✅\",\"label\":\"承諾する\",\"description\":\"日程OKと伝える\"}]".into() },
         ChatMessage { role: "user".into(), content: mail_body.to_string() },
     ];
-    let raw = chat(llm, messages).await?;
+    let raw = chat(llm, messages, "draft_nuances").await?;
     let start = raw.find('[').ok_or("JSON配列が見つかりません")?;
     let end = raw.rfind(']').ok_or("JSON配列が見つかりません")? + 1;
     serde_json::from_str(&raw[start..end]).map_err(|e| format!("JSON解析失敗: {e}"))
@@ -220,7 +242,7 @@ pub async fn draft_reply(llm: &LlmConfig, mail_body: &str, nuance: &str, instruc
         ChatMessage { role: "system".into(), content: "あなたはビジネスメール返信アシスタントです。自然な日本語で返信文のみを出力してください。".into() },
         ChatMessage { role: "user".into(), content: format!("{prompt}\n\n---\n{mail_body}") },
     ];
-    chat(llm, messages).await
+    chat(llm, messages, "draft_reply").await
 }
 
 pub async fn translate(llm: &LlmConfig, text: &str, target_lang: &str) -> Result<String, String> {
@@ -234,5 +256,5 @@ pub async fn translate(llm: &LlmConfig, text: &str, target_lang: &str) -> Result
         ChatMessage { role: "system".into(), content: system },
         ChatMessage { role: "user".into(), content: text.to_string() },
     ];
-    chat(llm, messages).await
+    chat(llm, messages, "translate").await
 }

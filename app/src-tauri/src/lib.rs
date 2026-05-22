@@ -255,13 +255,28 @@ fn get_ai_usage_months() -> Vec<String> {
 }
 
 #[tauri::command]
-fn get_ai_usage_for_month(month: String) -> ai_usage::UsageSummary {
+fn get_ai_usage_for_month(month: String) -> Result<ai_usage::UsageSummary, String> {
     ai_usage::get_summary_for_month(&month)
 }
 
 #[tauri::command]
 fn set_ai_budget(limit_usd: f64) {
     ai_usage::set_budget_limit(limit_usd);
+}
+
+#[tauri::command]
+fn get_ai_daily_costs(days: u32) -> Vec<ai_usage::DailyCostEntry> {
+    ai_usage::get_daily_costs(days)
+}
+
+#[tauri::command]
+fn get_ai_feature_costs(month: String) -> Vec<ai_usage::FeatureCostEntry> {
+    ai_usage::get_feature_costs(&month)
+}
+
+#[tauri::command]
+fn get_ai_history() -> Vec<ai_usage::UsageLogEntry> {
+    ai_usage::get_history()
 }
 
 // AI
@@ -521,6 +536,7 @@ pub fn run() {
             send_mail, send_mail_with_attachments,
             list_bedrock_models,
             get_ai_usage, get_ai_usage_months, get_ai_usage_for_month, set_ai_budget,
+            get_ai_daily_costs, get_ai_feature_costs, get_ai_history,
             ai_summarize, ai_draft_nuances, ai_draft_reply, ai_translate,
             google_oauth_login, google_oauth_refresh, list_google_calendars,
             detect_calendar_events, register_calendar_event,
