@@ -49,6 +49,8 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   goInbox: 'g i', goStarred: 'g s', goSent: 'g t', goDrafts: 'g d', goAll: 'g a',
 };
 
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+
 export interface AppSettings {
   accounts: Account[];
   activeAccountIndex: number;
@@ -58,6 +60,7 @@ export interface AppSettings {
   shortcuts: ShortcutMap;
   dateFormat: string;
   timezone: string;
+  logLevel: LogLevel;
 }
 
 export const DEFAULT_ACCOUNT_EXTRAS = {
@@ -84,6 +87,7 @@ export const DEFAULTS: AppSettings = {
   shortcuts: { ...DEFAULT_SHORTCUTS },
   dateFormat: 'YYYY/MM/DD HH:mm:ss',
   timezone: 'Asia/Tokyo',
+  logLevel: 'info' as LogLevel,
 };
 
 let _store: Awaited<ReturnType<typeof load>> | null = null;
@@ -146,14 +150,15 @@ export function getSmtpConfig(account: Account) {
 export function getLlmConfig(llm: LlmSettings): { base_url: string; model: string; api_key: string } {
   switch (llm.activeProvider) {
     case 'ollama': return { base_url: llm.ollama.base_url, model: `ollama/${llm.ollama.model}`, api_key: '' };
-    case 'openai': return { base_url: 'http://localhost:4000', model: `openai/${llm.openai.model}`, api_key: '' };
-    case 'anthropic': return { base_url: 'http://localhost:4000', model: `anthropic/${llm.anthropic.model}`, api_key: '' };
+    case 'openai': return { base_url: 'https://api.openai.com/v1', model: llm.openai.model, api_key: llm.openai.api_key };
+    case 'anthropic': return { base_url: 'https://api.anthropic.com/v1', model: llm.anthropic.model, api_key: llm.anthropic.api_key };
     case 'bedrock':
       if (llm.bedrock.auth_mode === 'api_key' && llm.bedrock.api_key) {
         return { base_url: `https://bedrock-runtime.${llm.bedrock.region}.amazonaws.com`, model: llm.bedrock.model, api_key: llm.bedrock.api_key };
       }
-      return { base_url: 'http://localhost:4000', model: `bedrock/${llm.bedrock.model}`, api_key: '' };
-    case 'gemini': return { base_url: 'http://localhost:4000', model: `gemini/${llm.gemini.model}`, api_key: '' };
+      // IAM auth: requires SigV4 signing in Rust backend
+      return { base_url: `bedrock://${llm.bedrock.region}`, model: llm.bedrock.model, api_key: '' };
+    case 'gemini': return { base_url: 'https://generativelanguage.googleapis.com/v1beta/openai', model: llm.gemini.model, api_key: llm.gemini.api_key };
   }
 }
 
