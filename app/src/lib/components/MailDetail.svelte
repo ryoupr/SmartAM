@@ -118,7 +118,18 @@
   });
 
   function sanitizeHtml(html: string): string {
-    return html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '').replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+    let s = html;
+    // Remove <script> tags and inline event handlers
+    s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
+    s = s.replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
+    s = s.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+    // Strip document structure tags to prevent nested <html> in srcdoc
+    s = s.replace(/<\/?html[^>]*>/gi, '');
+    s = s.replace(/<head[\s\S]*?<\/head>/gi, '');
+    s = s.replace(/<\/?body[^>]*>/gi, '');
+    // Remove any CSP meta tags that could conflict with our own
+    s = s.replace(/<meta[^>]*Content-Security-Policy[^>]*>/gi, '');
+    return s;
   }
 
   function buildSrcdoc(html: string): string {
@@ -131,12 +142,12 @@ td,th{padding:4px 8px;word-break:break-word}
 a{color:#1e66f5;cursor:pointer}
 blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 *{max-width:100%;box-sizing:border-box}
-</style><script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});<\/script></head><body>${safe}</body></html>`;
+</style><script>document.addEventListener('DOMContentLoaded',function(){document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});});<\/script></head><body>${safe}</body></html>`;
   }
 
   function linkifyText(text: string): string {
     const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return escaped.replace(/(https?:\/\/[^\s<>&]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return escaped.replace(/(https?:\/\/[^\s<>&]+)/g, '<a href="$1">$1</a>');
   }
 
   function togglePanel(type: string) {
