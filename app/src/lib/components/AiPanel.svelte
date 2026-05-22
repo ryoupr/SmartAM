@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import Icon from './Icon.svelte';
 
   let { mailBody, llmConfig, onClose, onUseReply, initialPanel = 'summary' }: {
     mailBody: string;
@@ -65,10 +66,10 @@
 
 <div class="ai-panel" style="--ac:{colors[panel] ?? 'var(--mauve)'}">
   <div class="ai-hdr">
-    {#if panel === 'summary'}📝 要約
-    {:else if panel === 'nuance'}✍ Step 1: どう返信しますか？
-    {:else if panel === 'draft'}✍ Step 2: 返信案（{selectedNuance}）
-    {:else if panel === 'translate'}🌐 翻訳
+    {#if panel === 'summary'}<Icon name="summary" size={14} /> 要約
+    {:else if panel === 'nuance'}<Icon name="draft" size={14} /> Step 1: どう返信しますか？
+    {:else if panel === 'draft'}<Icon name="draft" size={14} /> Step 2: 返信案（{selectedNuance}）
+    {:else if panel === 'translate'}<Icon name="translate" size={14} /> 翻訳
     {/if}
     <button class="x" onclick={onClose}>✕</button>
   </div>
@@ -95,7 +96,7 @@
     <div class="draft-row">
       <button class="back" onclick={() => { panel = 'nuance'; loading = true; startDraft(); }}>← ニュアンス選択に戻る</button>
       <input bind:value={instruction} placeholder="例: もっと丁寧に" class="inst" />
-      <button class="regen" onclick={regenerate}>🔄 再生成</button>
+      <button class="regen" onclick={regenerate}><Icon name="regen" size={12} /> 再生成</button>
       <button class="use" onclick={() => onUseReply?.(result)}>使う</button>
     </div>
   {:else}
@@ -108,8 +109,8 @@
       </div>
     {/if}
     <div class="act-row">
-      <button class="copy" onclick={() => navigator.clipboard.writeText(result)}>📋 コピー</button>
-      <button class="regen" onclick={panel === 'summary' ? summarize : translate}>🔄 再生成</button>
+      <button class="copy" onclick={() => navigator.clipboard.writeText(result)}><Icon name="attach" size={12} /> コピー</button>
+      <button class="regen" onclick={panel === 'summary' ? summarize : translate}><Icon name="regen" size={12} /> 再生成</button>
     </div>
   {/if}
 </div>

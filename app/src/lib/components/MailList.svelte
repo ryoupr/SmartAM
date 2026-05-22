@@ -1,13 +1,15 @@
 <script lang="ts">
   import type { MailSummary } from '$lib/types';
   import { formatMailDate } from '$lib/store';
+  import Icon from './Icon.svelte';
 
-  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo', selectedUids = $bindable(new Set<number>()), onMultiSelect }: {
+  let { mails, selectedUid, onSelect, onLoadMore, onSearchInput, onRefresh, loading = false, loadingMore = false, searchQuery = $bindable(''), pageSize = 200, dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo', selectedUids = $bindable(new Set<number>()), onMultiSelect, folderLabel = '受信トレイ' }: {
     mails: MailSummary[];
     selectedUid: number | null;
     onSelect: (uid: number) => void;
     onLoadMore?: () => void;
     onSearchInput?: (q: string) => void;
+    onRefresh?: () => void;
     loading?: boolean;
     loadingMore?: boolean;
     searchQuery?: string;
@@ -16,7 +18,10 @@
     timezone?: string;
     selectedUids?: Set<number>;
     onMultiSelect?: (uids: Set<number>) => void;
+    folderLabel?: string;
   } = $props();
+
+  let unreadCount = $derived(mails.filter(m => !m.seen).length);
 
   const ITEM_HEIGHT = 50;
   const OVERSCAN = 5;
@@ -80,6 +85,11 @@
 </script>
 
 <div class="mail-list" onscroll={handleScroll} bind:this={listEl}>
+  <div class="list-header">
+    <span class="list-title">{folderLabel}</span>
+    <span class="list-count">{mails.length} 件{unreadCount > 0 ? ` · 新着 ${unreadCount}` : ''}</span>
+    {#if onRefresh}<button class="refresh" onclick={onRefresh} title="更新"><Icon name="regen" size={14} /></button>{/if}
+  </div>
   <div class="search">
     <input type="text" placeholder="🔍 検索..." bind:value={searchQuery} oninput={(e) => onSearchInput?.(e.currentTarget.value)} />
     {#if searchQuery}<button class="clear" onclick={() => { searchQuery = ''; onSearchInput?.(''); }}>✕</button>{/if}
@@ -111,26 +121,30 @@
 </div>
 
 <style>
-  .mail-list { width:290px;min-width:290px;border-right:1px solid var(--surface1);overflow-y:auto;display:flex;flex-direction:column }
+  .mail-list { width:380px;min-width:380px;border-right:1px solid var(--surface1);overflow-y:auto;display:flex;flex-direction:column }
+  .list-header { display:flex;align-items:center;padding:12px 12px 4px;gap:8px;flex-shrink:0 }
+  .list-title { font-size:17px;font-weight:700;color:var(--ink, var(--text)) }
+  .list-count { font-size:11px;color:var(--ink-60, var(--overlay));flex:1 }
+  .refresh { background:none;border:none;color:var(--ink-60, var(--overlay));cursor:pointer;padding:4px;border-radius:4px }
+  .refresh:hover { background:var(--bone, var(--surface0)) }
   .search { padding:8px;position:relative;flex-shrink:0 }
-  .search input { width:100%;padding:6px 28px 6px 10px;border-radius:6px;border:none;background:var(--surface0);color:var(--text);font-size:11px }
-  .search input:focus { outline:1px solid var(--mauve) }
-  .search input::placeholder { color:var(--overlay) }
+  .search input { width:100%;padding:6px 28px 6px 10px;border-radius:6px;border:1.5px solid var(--line, var(--surface1));background:var(--paper-wh, var(--surface0));color:var(--ink, var(--text));font-size:11px }
+  .search input:focus { outline:none;border-color:var(--red) }
+  .search input::placeholder { color:var(--ink-40, var(--overlay)) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
-  .result-count { padding:0 12px 4px;color:var(--overlay);font-size:9px;flex-shrink:0 }
+  .result-count { padding:0 12px 4px;color:var(--ink-60, var(--overlay));font-size:9px;flex-shrink:0 }
   .virtual-container { position:relative;flex:1 }
   .virtual-offset { position:absolute;left:0;right:0;top:0 }
-  .mail-item { padding:10px 12px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--surface1);border-left:2px solid transparent;height:50px;box-sizing:border-box;outline:none;width:100%;display:block }
-  .mail-item:hover { background:var(--surface0) }
-  .mail-item:focus-visible { background:var(--surface0);border-left-color:var(--mauve) }
-  .mail-item.selected { background:var(--surface0);border-left-color:var(--mauve) }
-  .mail-item.unread { background:rgba(137,180,250,0.06) }
-  .mail-item.unread .from { font-weight:700 }
-  .mail-item.unread .from::before { content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--blue);margin-right:6px;vertical-align:middle }
+  .mail-item { padding:12px 16px 12px 13px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--line, var(--surface1));border-left:3px solid transparent;height:50px;box-sizing:border-box;outline:none;width:100%;display:block }
+  .mail-item:hover { background:var(--paper, var(--surface0)) }
+  .mail-item.selected { background:var(--paper-wh, var(--surface0));border-left-color:var(--red) }
+  .mail-item.unread { border-left-color:var(--red) }
+  .mail-item.unread .from { font-weight:600 }
+  .mail-item.unread .subject { font-weight:500 }
   .mail-header { display:flex;justify-content:space-between;margin-bottom:4px }
-  .from { color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0 }
-  .date { color:var(--overlay);font-size:9px }
-  .subject { color:var(--text);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
-  .empty { color:var(--overlay);text-align:center;padding:40px;font-size:12px }
+  .from { color:var(--ink, var(--text));font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0 }
+  .date { color:var(--ink-60, var(--overlay));font-size:9px;font-family:'JetBrains Mono',monospace }
+  .subject { color:var(--ink-80, var(--text));font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+  .empty { color:var(--ink-40, var(--overlay));text-align:center;padding:40px;font-size:12px }
   .loading-more { text-align:center;padding:12px;color:var(--overlay);font-size:10px }
 </style>

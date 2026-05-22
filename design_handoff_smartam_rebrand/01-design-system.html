@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>SmartAM · Design System</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* Brand · Light */
+      --cream:  #f6efe4;
+      --paper:  #faf5e7;
+      --ink:    #1a1410;
+      --ink-80: #1a1410cc;
+      --ink-60: #1a141099;
+      --ink-40: #1a141066;
+      --ink-20: #1a141033;
+      --line:   rgba(26,20,16,0.12);
+      --red:    #c8281e;
+      --red-80: #c8281ecc;
+      --red-20: #c8281e33;
+
+      /* App · Dark (Catppuccin Mocha + brand red) */
+      --base:    #1e1e2e;
+      --mantle:  #181825;
+      --crust:   #11111b;
+      --surface0:#313244;
+      --surface1:#45475a;
+      --text:    #cdd6f4;
+      --subtext: #a6adc8;
+      --overlay: #6c7086;
+      --mauve:   #cba6f7;
+      --yellow:  #f9e2af;
+      --blue:    #89b4fa;
+      --green:   #a6e3a1;
+      --pink:    #f38ba8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      line-height: 1.5;
+      font-feature-settings: "ss01" on, "cv11" on;
+    }
+    a { color: inherit; }
+
+    /* ── Sticky TOC ───────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 56px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 56px 48px 120px;
+    }
+    nav.toc {
+      position: sticky; top: 56px;
+      align-self: start;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    nav.toc .brand {
+      border-top: 4px solid var(--red); padding-top: 10px;
+      margin-bottom: 24px;
+    }
+    nav.toc .brand .chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 36px; line-height: 0.9; letter-spacing: -0.05em;
+      color: transparent; -webkit-text-stroke: 1.5px var(--ink);
+      display: inline-block; margin-bottom: 2px;
+    }
+    nav.toc .brand .bar { height: 4px; width: 32px; background: var(--red); }
+    nav.toc .brand .title {
+      margin-top: 12px;
+      font-family: 'Inter', sans-serif; font-weight: 700; font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+    nav.toc .brand .title .am { color: var(--red); }
+    nav.toc .brand .sub {
+      margin-top: 4px;
+      font-size: 10px; opacity: 0.55; letter-spacing: 0.12em;
+    }
+    nav.toc ol { list-style: none; padding: 0; }
+    nav.toc li { padding: 5px 0; }
+    nav.toc li a {
+      text-decoration: none; color: var(--ink-60);
+      transition: color 0.15s;
+    }
+    nav.toc li a:hover { color: var(--red); }
+    nav.toc li span { display: inline-block; width: 24px; color: var(--red); }
+
+    /* ── Section frame ───────────────────────── */
+    main > section { margin-bottom: 80px; scroll-margin-top: 40px; }
+    main > section > h2 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--ink-60);
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    main > section > h2 .num { color: var(--red); font-weight: 700; margin-right: 14px; }
+    main > section > h3 {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800; font-size: 38px;
+      letter-spacing: -0.025em; line-height: 1.05;
+      margin-bottom: 20px;
+    }
+    main > section > p.lead {
+      font-size: 16px; opacity: 0.7; max-width: 640px;
+      margin-bottom: 36px; line-height: 1.55;
+    }
+
+    h4 {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    h4 .num {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; opacity: 0.55; font-weight: 500;
+      margin-right: 10px;
+    }
+    .desc { font-size: 13px; color: var(--ink-60); margin-bottom: 14px; line-height: 1.5; }
+
+    /* Card pattern — for swatches, type specimens, components */
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .card.dark { background: var(--base); color: var(--text); border-color: rgba(255,255,255,0.08); }
+
+    /* Grid utilities */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+    @media (max-width: 900px) {
+      .grid-3, .grid-4, .grid-6 { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; padding: 24px; }
+      nav.toc { position: relative; top: 0; }
+    }
+
+    /* ── 01 Logo ────────────────────────────── */
+    .logo-hero {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 48px;
+      display: grid;
+      grid-template-columns: auto 1fr; gap: 48px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .logo-hero .mark .chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 180px; line-height: 0.9;
+      color: transparent; -webkit-text-stroke: 6px var(--ink);
+      letter-spacing: -0.05em; display: inline-block;
+    }
+    .logo-hero .mark .bar {
+      height: 20px; width: 170px; background: var(--red); margin-top: 4px;
+    }
+    .logo-hero .info dl {
+      display: grid; grid-template-columns: 90px 1fr; gap: 12px 24px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    }
+    .logo-hero .info dt { color: var(--ink-60); letter-spacing: 0.05em; }
+    .logo-hero .info dd { color: var(--ink); }
+
+    .do-dont { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .do-dont .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .do-dont .item .preview {
+      height: 100px; display: flex; align-items: center; justify-content: center;
+      background: var(--cream); border-radius: 4px;
+      position: relative;
+    }
+    .do-dont .item .label {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; display: flex; align-items: center; gap: 6px;
+    }
+    .do-dont .item.do .label { color: #14532d; }
+    .do-dont .item.dont .label { color: var(--red); }
+    .do-dont .item .label::before {
+      content: ""; width: 8px; height: 8px; border-radius: 2px;
+    }
+    .do-dont .item.do .label::before { background: #14532d; }
+    .do-dont .item.dont .label::before { background: var(--red); }
+    .do-dont .item .note { font-size: 11px; color: var(--ink-60); line-height: 1.4; }
+    .mini-chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 48px; line-height: 0.9; letter-spacing: -0.05em;
+      display: inline-block;
+    }
+    .mini-bar { height: 6px; background: var(--red); margin-top: 2px; }
+
+    /* ── 02 Color ───────────────────────────── */
+    .swatch {
+      border-radius: 8px;
+      padding: 18px;
+      min-height: 110px;
+      display: flex; flex-direction: column; justify-content: space-between;
+      position: relative; overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .swatch .name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.08em; font-weight: 500;
+    }
+    .swatch .hex {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .swatch.role {
+      font-size: 10px; opacity: 0.7; margin-top: 4px;
+    }
+    .palette-title {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.15em; color: var(--ink-60); margin-bottom: 12px;
+    }
+
+    /* ── 03 Type ────────────────────────────── */
+    .type-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 200px;
+      gap: 24px; align-items: baseline;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .type-row:last-child { border-bottom: none; }
+    .type-row .meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--ink-60); letter-spacing: 0.05em;
+    }
+    .type-row .specimen { font-family: 'Inter', sans-serif; color: var(--ink); }
+    .type-row .spec {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--ink-60); letter-spacing: 0.05em; text-align: right;
+    }
+
+    /* ── 04 Spacing ─────────────────────────── */
+    .spacing-row { display: flex; align-items: center; gap: 18px; padding: 10px 0; }
+    .spacing-row .bar { background: var(--red); height: 24px; border-radius: 2px; }
+    .spacing-row .label {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      width: 80px;
+    }
+    .spacing-row .px {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--ink-60); width: 60px;
+    }
+    .spacing-row .use { font-size: 12px; color: var(--ink-60); }
+
+    /* ── 05 Radius & shadow ─────────────────── */
+    .radius-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    .radius-cell {
+      background: var(--paper); border: 1px solid var(--line);
+      padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .radius-shape { width: 64px; height: 64px; background: var(--ink); }
+    .radius-cell .label {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.7;
+    }
+    .shadow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 14px; }
+    .shadow-cell {
+      background: var(--paper);
+      padding: 32px; border-radius: 8px;
+    }
+    .shadow-cell .box {
+      width: 100%; height: 64px; background: var(--cream); border-radius: 6px;
+    }
+    .shadow-cell .label {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      margin-top: 14px; opacity: 0.7;
+    }
+    .shadow-subtle   .box { box-shadow: 0 1px 3px rgba(26,20,16,0.08); }
+    .shadow-card     .box { box-shadow: 0 4px 12px rgba(26,20,16,0.10); }
+    .shadow-floating .box { box-shadow: 0 16px 36px rgba(26,20,16,0.18); }
+
+    /* ── 06 Components ──────────────────────── */
+    .comp-row {
+      display: flex; gap: 16px; align-items: center;
+      padding: 24px; background: var(--paper);
+      border: 1px solid var(--line); border-radius: 8px;
+      flex-wrap: wrap;
+    }
+    .comp-row.dark { background: var(--base); border-color: rgba(255,255,255,0.08); }
+    .comp-row .cap {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; color: var(--ink-60); flex: 0 0 100%;
+      margin-bottom: -4px;
+    }
+    .comp-row.dark .cap { color: var(--overlay); }
+
+    /* Buttons */
+    .btn {
+      font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13px;
+      padding: 9px 16px; border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer; line-height: 1;
+      display: inline-flex; align-items: center; gap: 8px;
+      letter-spacing: -0.01em;
+      transition: all 0.12s;
+    }
+    .btn-primary  { background: var(--red); color: var(--cream); border-color: var(--red); }
+    .btn-primary:hover { background: #a02019; border-color: #a02019; }
+    .btn-secondary { background: transparent; color: var(--ink); border-color: var(--ink-40); }
+    .btn-secondary:hover { border-color: var(--ink); background: var(--ink); color: var(--cream); }
+    .btn-ghost { background: transparent; color: var(--ink-80); border-color: transparent; }
+    .btn-ghost:hover { background: var(--ink-20); color: var(--ink); }
+    .btn-danger { background: transparent; color: var(--red); border-color: var(--red-20); }
+    .btn-danger:hover { background: var(--red); color: var(--cream); border-color: var(--red); }
+
+    /* Inputs */
+    .input {
+      font-family: 'Inter', sans-serif; font-size: 13px;
+      padding: 10px 12px; border-radius: 6px;
+      border: 1px solid var(--ink-20);
+      background: var(--cream);
+      color: var(--ink);
+      width: 220px;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+    .input:focus { border-color: var(--red); }
+    .input::placeholder { color: var(--ink-40); }
+
+    /* Badges / chips */
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 8px; border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--ink-20);
+    }
+    .badge.red { background: var(--red); color: var(--cream); border-color: var(--red); }
+    .badge.dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* AI button styles (dark variant) */
+    .ai-btn {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--surface0);
+      border: 1.5px solid;
+      font-size: 16px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ai-btn:hover { background: var(--surface1); }
+    .ai-btn.summary  { color: var(--green);  border-color: var(--green); }
+    .ai-btn.draft    { color: var(--yellow); border-color: var(--yellow); }
+    .ai-btn.translate{ color: var(--blue);   border-color: var(--blue); }
+    .ai-btn.calendar { color: var(--blue);   border-color: var(--blue); }
+    .ai-btn.regen    { color: var(--mauve);  border-color: var(--mauve); }
+
+    /* Toast example */
+    .toast {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: var(--base); color: var(--text);
+      padding: 12px 16px; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      font-size: 13px; max-width: 380px;
+      border-left: 4px solid var(--green);
+    }
+    .toast.undo { border-left-color: var(--blue); }
+    .toast .undo-link { color: var(--blue); cursor: pointer; text-decoration: underline; }
+
+    /* Card sample */
+    .ds-card {
+      background: var(--cream); border-radius: 10px; padding: 16px 18px;
+      border: 1px solid var(--ink-20);
+      min-width: 220px;
+    }
+    .ds-card .head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ds-card .head .name { font-weight: 600; font-size: 13px; }
+    .ds-card .head .time { margin-left: auto; font-size: 10px; color: var(--ink-60); font-family: 'JetBrains Mono', monospace; }
+    .ds-card .subj { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+    .ds-card .pre { font-size: 12px; color: var(--ink-60); line-height: 1.4; }
+    .ds-card.unread { border-left: 3px solid var(--red); padding-left: 15px; }
+
+    /* ── 07 Iconography ─────────────────────── */
+    .icon-grid {
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px;
+    }
+    .icon-cell {
+      background: var(--paper); border-radius: 6px;
+      padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      border: 1px solid var(--line);
+    }
+    .icon-cell svg { display: block; }
+    .icon-cell .label {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; opacity: 0.6;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── 08 Writing ─────────────────────────── */
+    .voice-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    .voice-col h5 {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; padding-bottom: 8px; margin-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .voice-col.do h5    { color: #14532d; }
+    .voice-col.dont h5 { color: var(--red); }
+    .voice-col p {
+      font-size: 13px; padding: 8px 0; color: var(--ink);
+      border-bottom: 1px dashed var(--ink-20);
+    }
+    .voice-col p:last-child { border-bottom: none; }
+    .voice-col .label { font-size: 10px; color: var(--ink-60); font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+
+    <!-- ── TOC ───────────────────────────── -->
+    <nav class="toc">
+      <div class="brand">
+        <div class="chi">智</div>
+        <div class="bar"></div>
+        <div class="title">Smart<span class="am">AM</span></div>
+        <div class="sub">DESIGN SYSTEM · v0.1</div>
+      </div>
+      <ol>
+        <li><a href="#logo"><span>01</span>Logo</a></li>
+        <li><a href="#color"><span>02</span>Color</a></li>
+        <li><a href="#type"><span>03</span>Type</a></li>
+        <li><a href="#space"><span>04</span>Space</a></li>
+        <li><a href="#shape"><span>05</span>Shape</a></li>
+        <li><a href="#comp"><span>06</span>Components</a></li>
+        <li><a href="#icon"><span>07</span>Iconography</a></li>
+        <li><a href="#voice"><span>08</span>Voice</a></li>
+      </ol>
+    </nav>
+
+    <!-- ── MAIN ──────────────────────────── -->
+    <main>
+
+      <!-- ── 01 Logo ─────────────────────── -->
+      <section id="logo">
+        <h2><span class="num">01</span>LOGO</h2>
+        <h3>智 · CHI · Outline + Red Bar</h3>
+        <p class="lead">SmartAM の Smart を漢字一字「智」で表す。Noto Sans JP Black のアウトライン文字＋赤い水平バー。バーは知性の「下線」、編集の「アンダーバー」、出版物の「報道帯」の三重メタファ。</p>
+
+        <div class="logo-hero">
+          <div class="mark">
+            <div class="chi">智</div>
+            <div class="bar"></div>
+          </div>
+          <div class="info">
+            <dl>
+              <dt>Character</dt><dd>智 (CHI · ちえ / さとし) — wisdom / smart</dd>
+              <dt>Typeface</dt><dd>Noto Sans JP · Black 900 · letter-spacing -0.05em</dd>
+              <dt>Stroke</dt><dd>2.5% of font-size, color ink (#1A1410)</dd>
+              <dt>Bar</dt><dd>width 90% of glyph, height 10% of font-size, color red (#C8281E)</dd>
+              <dt>Clear space</dt><dd>4ch on all sides — no other element may intrude</dd>
+              <dt>Min size</dt><dd>16px (≤32px は塗り版に切替)</dd>
+            </dl>
+          </div>
+        </div>
+
+        <h4><span class="num">1.1</span>Do / Don't</h4>
+        <div class="do-dont">
+          <div class="item do">
+            <div class="preview">
+              <div>
+                <span class="mini-chi" style="color: transparent; -webkit-text-stroke: 2px var(--ink);">智</span>
+                <div class="mini-bar" style="width: 48px;"></div>
+              </div>
+            </div>
+            <div class="label">DO</div>
+            <div class="note">アウトラインの太さ・字間・バー比率を維持。</div>
+          </div>
+          <div class="item dont">
+            <div class="preview">
+              <span class="mini-chi" style="color: var(--ink);">智</span>
+            </div>
+            <div class="label">DON'T</div>
+            <div class="note">塗り潰しは小サイズ用のみ。標準形では使わない。</div>
+          </div>
+          <div class="item dont">
+            <div class="preview" style="background: var(--red);">
+              <div>
+                <span class="mini-chi" style="color: transparent; -webkit-text-stroke: 2px white;">智</span>
+                <div class="mini-bar" style="width: 48px; background: white;"></div>
+              </div>
+            </div>
+            <div class="label">DON'T</div>
+            <div class="note">赤を背景色にしない。バーが消える。</div>
+          </div>
+          <div class="item dont">
+            <div class="preview">
+              <span class="mini-chi" style="color: transparent; -webkit-text-stroke: 2px var(--ink); transform: skewX(-12deg); display: inline-block;">智</span>
+            </div>
+            <div class="label">DON'T</div>
+            <div class="note">傾けたり変形しない。回転・スキュー禁止。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 02 Color ────────────────────── -->
+      <section id="color">
+        <h2><span class="num">02</span>COLOR</h2>
+        <h3>Cream × Ink × Red — Light Brand</h3>
+        <p class="lead">ブランド面（README、Web、ドキュメント、印刷）はクリーム背景＋黒インク＋ブランド赤の 3 色構造。アプリ本体は Catppuccin Mocha の暗色を継承しつつ、プライマリアクションのみブランド赤に差し替え。</p>
+
+        <div class="palette-title">━ BRAND · LIGHT (web, docs, marketing)</div>
+        <div class="grid-4" style="margin-bottom: 32px;">
+          <div class="swatch" style="background: var(--cream); color: var(--ink);">
+            <div class="name">Cream</div>
+            <div>
+              <div class="hex">#F6EFE4</div>
+              <div class="role">canvas / paper</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--paper); color: var(--ink);">
+            <div class="name">Paper</div>
+            <div>
+              <div class="hex">#FAF5E7</div>
+              <div class="role">cards / wells</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--ink); color: var(--cream);">
+            <div class="name">Ink</div>
+            <div>
+              <div class="hex">#1A1410</div>
+              <div class="role">text / mark</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--red); color: var(--cream);">
+            <div class="name">Brand Red</div>
+            <div>
+              <div class="hex">#C8281E</div>
+              <div class="role">primary / accent</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-title">━ INK OPACITY (text hierarchy)</div>
+        <div class="grid-4" style="margin-bottom: 32px;">
+          <div class="swatch" style="background: var(--cream); color: var(--ink);">
+            <div class="name">Ink 100</div>
+            <div>
+              <div class="hex">#1A1410</div>
+              <div class="role">primary text</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--cream); color: var(--ink-80);">
+            <div class="name">Ink 80</div>
+            <div>
+              <div class="hex">CC opacity</div>
+              <div class="role">body text</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--cream); color: var(--ink-60);">
+            <div class="name">Ink 60</div>
+            <div>
+              <div class="hex">99 opacity</div>
+              <div class="role">secondary</div>
+            </div>
+          </div>
+          <div class="swatch" style="background: var(--cream); color: var(--ink-40);">
+            <div class="name">Ink 40</div>
+            <div>
+              <div class="hex">66 opacity</div>
+              <div class="role">tertiary / hint</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="palette-title">━ APP · DARK (mail client, Catppuccin Mocha + brand red)</div>
+        <div class="grid-4" style="margin-bottom: 16px;">
+          <div class="swatch" style="background: var(--base); color: var(--text); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Base</div>
+            <div><div class="hex">#1E1E2E</div><div class="role">window bg</div></div>
+          </div>
+          <div class="swatch" style="background: var(--mantle); color: var(--text); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Mantle</div>
+            <div><div class="hex">#181825</div><div class="role">sidebar / sections</div></div>
+          </div>
+          <div class="swatch" style="background: var(--surface0); color: var(--text); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Surface 0</div>
+            <div><div class="hex">#313244</div><div class="role">cards / inputs</div></div>
+          </div>
+          <div class="swatch" style="background: var(--surface1); color: var(--text); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Surface 1</div>
+            <div><div class="hex">#45475A</div><div class="role">hover / pressed</div></div>
+          </div>
+        </div>
+        <div class="grid-4" style="margin-bottom: 32px;">
+          <div class="swatch" style="background: var(--base); color: var(--text); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Text</div>
+            <div><div class="hex">#CDD6F4</div><div class="role">primary</div></div>
+          </div>
+          <div class="swatch" style="background: var(--base); color: var(--subtext); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Subtext</div>
+            <div><div class="hex">#A6ADC8</div><div class="role">secondary</div></div>
+          </div>
+          <div class="swatch" style="background: var(--base); color: var(--overlay); border-color: rgba(255,255,255,0.08);">
+            <div class="name">Overlay</div>
+            <div><div class="hex">#6C7086</div><div class="role">tertiary / hint</div></div>
+          </div>
+          <div class="swatch" style="background: var(--red); color: var(--cream);">
+            <div class="name">Brand Red</div>
+            <div><div class="hex">#C8281E</div><div class="role">primary CTA</div></div>
+          </div>
+        </div>
+
+        <div class="palette-title">━ SEMANTIC (AI feature colors — same as existing app)</div>
+        <div class="grid-6">
+          <div class="swatch" style="background: var(--green); color: #11261a;">
+            <div class="name">Green</div>
+            <div><div class="hex">#A6E3A1</div><div class="role">summary · send</div></div>
+          </div>
+          <div class="swatch" style="background: var(--yellow); color: #3a2e0a;">
+            <div class="name">Yellow</div>
+            <div><div class="hex">#F9E2AF</div><div class="role">draft · star</div></div>
+          </div>
+          <div class="swatch" style="background: var(--blue); color: #0e1f3a;">
+            <div class="name">Blue</div>
+            <div><div class="hex">#89B4FA</div><div class="role">translate · cal</div></div>
+          </div>
+          <div class="swatch" style="background: var(--mauve); color: #2a1448;">
+            <div class="name">Mauve</div>
+            <div><div class="hex">#CBA6F7</div><div class="role">regen · llm</div></div>
+          </div>
+          <div class="swatch" style="background: var(--pink); color: #3a0a18;">
+            <div class="name">Pink</div>
+            <div><div class="hex">#F38BA8</div><div class="role">destructive</div></div>
+          </div>
+          <div class="swatch" style="background: var(--cream); color: var(--ink);">
+            <div class="name">Cream</div>
+            <div><div class="hex">#F6EFE4</div><div class="role">on-dark text</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 03 Type ─────────────────────── -->
+      <section id="type">
+        <h2><span class="num">03</span>TYPE</h2>
+        <h3>Inter · Noto Sans JP · JetBrains Mono</h3>
+        <p class="lead">英数は Inter（display 800、body 400–600）。日本語は Noto Sans JP。等幅は JetBrains Mono — メタ情報・コード・タグ用。日本語と英数の混植が前提。</p>
+
+        <div class="card">
+          <div class="type-row">
+            <span class="meta">DISPLAY</span>
+            <span class="specimen" style="font-size: 56px; font-weight: 800; letter-spacing: -0.03em;">SmartAM 智</span>
+            <span class="spec">56 / 800 / -3%</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">H1</span>
+            <span class="specimen" style="font-size: 38px; font-weight: 800; letter-spacing: -0.025em;">AI ネイティブメーラー</span>
+            <span class="spec">38 / 800 / -2.5%</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">H2</span>
+            <span class="specimen" style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em;">受信トレイ</span>
+            <span class="spec">26 / 700 / -2%</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">H3</span>
+            <span class="specimen" style="font-size: 20px; font-weight: 700; letter-spacing: -0.015em;">設定 · 通知</span>
+            <span class="spec">20 / 700 / -1.5%</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">TITLE</span>
+            <span class="specimen" style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">明日のミーティングについて</span>
+            <span class="spec">15 / 600 / -1%</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">BODY</span>
+            <span class="specimen" style="font-size: 14px; font-weight: 400; line-height: 1.55;">お世話になっております。来週の打ち合わせの日程を再調整させてください。火曜日もしくは水曜日午後はいかがでしょうか。</span>
+            <span class="spec">14 / 400 / 1.55</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">SMALL</span>
+            <span class="specimen" style="font-size: 12px; font-weight: 500; color: var(--ink-60);">2026-05-22 · 添付 2 件</span>
+            <span class="spec">12 / 500</span>
+          </div>
+          <div class="type-row">
+            <span class="meta">MONO</span>
+            <span class="specimen" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--ink-60);">SMARTAM · v0.1.0 · 智</span>
+            <span class="spec">11 / mono / +10%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 04 Space ────────────────────── -->
+      <section id="space">
+        <h2><span class="num">04</span>SPACE</h2>
+        <h3>4px ベースグリッド</h3>
+        <p class="lead">余白・パディング・ギャップは全て 4 の倍数。1〜2 倍ステップで設計。</p>
+
+        <div class="card">
+          <div class="spacing-row"><span class="label">space-1</span><div class="bar" style="width: 4px;"></div><span class="px">4 px</span><span class="use">アイコン内余白の最小</span></div>
+          <div class="spacing-row"><span class="label">space-2</span><div class="bar" style="width: 8px;"></div><span class="px">8 px</span><span class="use">行内アイコン gap</span></div>
+          <div class="spacing-row"><span class="label">space-3</span><div class="bar" style="width: 12px;"></div><span class="px">12 px</span><span class="use">タイトと本文の間</span></div>
+          <div class="spacing-row"><span class="label">space-4</span><div class="bar" style="width: 16px;"></div><span class="px">16 px</span><span class="use">カード内パディング</span></div>
+          <div class="spacing-row"><span class="label">space-6</span><div class="bar" style="width: 24px;"></div><span class="px">24 px</span><span class="use">セクション内余白</span></div>
+          <div class="spacing-row"><span class="label">space-8</span><div class="bar" style="width: 32px;"></div><span class="px">32 px</span><span class="use">カード間 gap</span></div>
+          <div class="spacing-row"><span class="label">space-12</span><div class="bar" style="width: 48px;"></div><span class="px">48 px</span><span class="use">セクション間</span></div>
+          <div class="spacing-row"><span class="label">space-16</span><div class="bar" style="width: 64px;"></div><span class="px">64 px</span><span class="use">ページマージン</span></div>
+        </div>
+      </section>
+
+      <!-- ── 05 Shape & Shadow ───────────── -->
+      <section id="shape">
+        <h2><span class="num">05</span>SHAPE</h2>
+        <h3>角丸 & 影</h3>
+        <p class="lead">角丸 5 段階、影 3 段階。「智」のシャープなアウトラインを邪魔しない控えめな丸み。</p>
+
+        <h4><span class="num">5.1</span>Radius</h4>
+        <div class="radius-grid">
+          <div class="radius-cell">
+            <div class="radius-shape" style="border-radius: 0;"></div>
+            <span class="label">none · 0</span>
+          </div>
+          <div class="radius-cell">
+            <div class="radius-shape" style="border-radius: 3px;"></div>
+            <span class="label">xs · 3 px</span>
+          </div>
+          <div class="radius-cell">
+            <div class="radius-shape" style="border-radius: 6px;"></div>
+            <span class="label">sm · 6 px (btn/input)</span>
+          </div>
+          <div class="radius-cell">
+            <div class="radius-shape" style="border-radius: 10px;"></div>
+            <span class="label">md · 10 px (card)</span>
+          </div>
+          <div class="radius-cell">
+            <div class="radius-shape" style="border-radius: 22.37%;"></div>
+            <span class="label">squircle (icon)</span>
+          </div>
+        </div>
+
+        <h4 style="margin-top: 32px;"><span class="num">5.2</span>Shadow</h4>
+        <div class="shadow-grid">
+          <div class="shadow-cell shadow-subtle">
+            <div class="box"></div>
+            <div class="label">subtle · 0 1px 3px / .08</div>
+          </div>
+          <div class="shadow-cell shadow-card">
+            <div class="box"></div>
+            <div class="label">card · 0 4px 12px / .10</div>
+          </div>
+          <div class="shadow-cell shadow-floating">
+            <div class="box"></div>
+            <div class="label">floating · 0 16px 36px / .18</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 06 Components ───────────────── -->
+      <section id="comp">
+        <h2><span class="num">06</span>COMPONENTS</h2>
+        <h3>UI 部品</h3>
+        <p class="lead">マーケティング面（Light）とアプリ面（Dark）の双方でほぼ同じ部品構成。色トークンだけ切り替える。</p>
+
+        <h4><span class="num">6.1</span>Buttons</h4>
+        <div class="comp-row" style="margin-bottom: 16px;">
+          <span class="cap">LIGHT</span>
+          <button class="btn btn-primary">📤 送信</button>
+          <button class="btn btn-secondary">下書きを保存</button>
+          <button class="btn btn-ghost">キャンセル</button>
+          <button class="btn btn-danger">🗑 削除</button>
+          <span class="badge">SMARTAM v0.1</span>
+          <span class="badge dot" style="color: #14532d;">同期済み</span>
+          <span class="badge red">NEW</span>
+        </div>
+
+        <h4><span class="num">6.2</span>Inputs</h4>
+        <div class="comp-row" style="margin-bottom: 16px;">
+          <span class="cap">FORM</span>
+          <input class="input" placeholder="メールを検索…" />
+          <input class="input" value="ryo@example.com" />
+          <input class="input" placeholder="無効" disabled style="opacity: 0.5;" />
+        </div>
+
+        <h4><span class="num">6.3</span>AI Buttons (dark · in-app)</h4>
+        <div class="comp-row dark" style="margin-bottom: 16px;">
+          <span class="cap">AI ACTION BUTTONS · COLOR-CODED</span>
+          <button class="ai-btn summary" title="要約">📝</button>
+          <button class="ai-btn draft" title="下書き">✍</button>
+          <button class="ai-btn translate" title="翻訳">🌐</button>
+          <button class="ai-btn calendar" title="カレンダー">📅</button>
+          <button class="ai-btn regen" title="再生成">🔄</button>
+          <span style="color: var(--subtext); font-size: 12px; margin-left: 12px;">
+            緑 = 要約 / 黄 = 下書き / 青 = 翻訳・カレンダー / 紫 = 再生成
+          </span>
+        </div>
+
+        <h4><span class="num">6.4</span>Mail row (list item)</h4>
+        <div class="comp-row" style="background: var(--cream); display: block; padding: 16px;">
+          <div class="ds-card unread" style="margin-bottom: 8px;">
+            <div class="head">
+              <span class="name">山田 太郎</span>
+              <span class="time">14:32</span>
+            </div>
+            <div class="subj">明日のミーティングについて</div>
+            <div class="pre">来週の打ち合わせの日程を再調整させてください。火曜日もしくは水曜日午後はいかがでしょうか…</div>
+          </div>
+          <div class="ds-card">
+            <div class="head">
+              <span class="name" style="opacity: 0.7;">GitHub</span>
+              <span class="time">12:08</span>
+            </div>
+            <div class="subj" style="font-weight: 400; opacity: 0.85;">[smartam] Workflow run failed</div>
+            <div class="pre">Your CI build #42 failed at "cargo check"…</div>
+          </div>
+        </div>
+
+        <h4 style="margin-top: 16px;"><span class="num">6.5</span>Toasts</h4>
+        <div class="comp-row" style="margin-bottom: 16px;">
+          <span class="cap">SYSTEM FEEDBACK · 5s auto-dismiss</span>
+          <div class="toast"><span>✓</span><span>メールを送信しました</span></div>
+          <div class="toast undo"><span>📦</span><span>1 件アーカイブしました</span><span class="undo-link">取り消す</span></div>
+        </div>
+      </section>
+
+      <!-- ── 07 Icon ─────────────────────── -->
+      <section id="icon">
+        <h2><span class="num">07</span>ICONOGRAPHY</h2>
+        <h3>機能アイコン</h3>
+        <p class="lead">線アイコン中心。1.5px ストロークの角丸ライン。AI ボタンは絵文字を採用（既存仕様）。サイズは 16/20/24px。</p>
+
+        <div class="icon-grid">
+          <div class="icon-cell"><span style="font-size: 28px;">📥</span><span class="label">受信トレイ</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">⭐</span><span class="label">スター</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">📤</span><span class="label">送信</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">📝</span><span class="label">下書き</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">🗑</span><span class="label">ゴミ箱</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">📦</span><span class="label">アーカイブ</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">↩</span><span class="label">返信</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">→</span><span class="label">転送</span></div>
+          <div class="icon-cell" style="background: var(--base); color: var(--green); border-color: transparent;">
+            <span style="font-size: 28px;">📝</span><span class="label" style="color: var(--green);">AI · 要約</span>
+          </div>
+          <div class="icon-cell" style="background: var(--base); color: var(--yellow); border-color: transparent;">
+            <span style="font-size: 28px;">✍</span><span class="label" style="color: var(--yellow);">AI · 下書き</span>
+          </div>
+          <div class="icon-cell" style="background: var(--base); color: var(--blue); border-color: transparent;">
+            <span style="font-size: 28px;">🌐</span><span class="label" style="color: var(--blue);">AI · 翻訳</span>
+          </div>
+          <div class="icon-cell" style="background: var(--base); color: var(--blue); border-color: transparent;">
+            <span style="font-size: 28px;">📅</span><span class="label" style="color: var(--blue);">AI · カレンダー</span>
+          </div>
+          <div class="icon-cell" style="background: var(--base); color: var(--mauve); border-color: transparent;">
+            <span style="font-size: 28px;">🔄</span><span class="label" style="color: var(--mauve);">再生成</span>
+          </div>
+          <div class="icon-cell"><span style="font-size: 28px;">⚙</span><span class="label">設定</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">🔍</span><span class="label">検索</span></div>
+          <div class="icon-cell"><span style="font-size: 28px;">📎</span><span class="label">添付</span></div>
+        </div>
+      </section>
+
+      <!-- ── 08 Voice ────────────────────── -->
+      <section id="voice">
+        <h2><span class="num">08</span>VOICE</h2>
+        <h3>ライティング・トーン</h3>
+        <p class="lead">日本語を主とする。簡潔・中立・余計な感情語を避ける。AI 機能でも「あなたの」「便利な」のような営業表現は使わない。</p>
+
+        <div class="voice-grid">
+          <div class="card voice-col do">
+            <h5>━ DO</h5>
+            <p>
+              <span class="label">ACTION</span><br>
+              📝 要約する
+            </p>
+            <p>
+              <span class="label">RESULT</span><br>
+              1 件アーカイブしました。
+            </p>
+            <p>
+              <span class="label">ERROR</span><br>
+              IMAP 接続に失敗しました。設定 → アカウントを確認してください。
+            </p>
+            <p>
+              <span class="label">CTA</span><br>
+              📤 送信 · 下書きを保存
+            </p>
+            <p>
+              <span class="label">PRINCIPLE</span><br>
+              動詞起点・体言止め混在 OK。命令形に統一しない。
+            </p>
+          </div>
+          <div class="card voice-col dont">
+            <h5>━ DON'T</h5>
+            <p>
+              <span class="label">過剰</span><br>
+              ✨ あなたのために要約を生成します！
+            </p>
+            <p>
+              <span class="label">擬人化</span><br>
+              AI が気を利かせて 1 件処理してあげました 🎉
+            </p>
+            <p>
+              <span class="label">説明過多</span><br>
+              IMAP プロトコルでメールサーバーに接続を試みた結果、ハンドシェイクで TLS エラーが発生したため通信を確立できませんでした。
+            </p>
+            <p>
+              <span class="label">煽り</span><br>
+              今すぐ送信！ 一押し！
+            </p>
+            <p>
+              <span class="label">PRINCIPLE</span><br>
+              AI を「擬人化」しない。トースト・ボタンは動作そのもの。
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

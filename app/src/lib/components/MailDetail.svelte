@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { slide } from 'svelte/transition';
+  import Button from './Button.svelte';
   import AiPanel from './AiPanel.svelte';
   import CalendarPanel from './CalendarPanel.svelte';
   import EventCard from './EventCard.svelte';
@@ -38,9 +39,18 @@
   let conflictsMap: Record<string, string[]> = $state({});
   let iframeEl: HTMLIFrameElement | undefined = $state(undefined);
   let iframeHeight = $state(200);
+  let detailEl: HTMLDivElement | undefined = $state(undefined);
+  let compact = $state(false);
 
   // Reset panels when mail changes
   $effect(() => { if (mail) starred = (mail as any).starred ?? false; });
+
+  $effect(() => {
+    if (!detailEl) return;
+    const ro = new ResizeObserver(([e]) => { compact = e.contentRect.width <= 600; });
+    ro.observe(detailEl);
+    return () => ro.disconnect();
+  });
 
   $effect(() => {
     const uid = mail?.uid ?? null;
@@ -218,7 +228,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   }
 </script>
 
-<div class="detail">
+<div class="detail" class:compact bind:this={detailEl}>
   {#if mail}
     <div class="header">
       <h2 class="subject">{mail.subject}</h2>
@@ -226,15 +236,17 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
       <div class="meta">To: {mail.to}</div>
     </div>
     <div class="actions">
-      <button class="btn" title="返信" onclick={onReply}>↩</button>
-      <button class="btn" title="転送" onclick={onForward}>→</button>
-      <button class="btn" title="アーカイブ" onclick={onArchive}>📦</button>
-      <button class="btn" title="削除" onclick={onDelete}>🗑</button>
-      <button class="btn" title="スター" class:starred onclick={() => { starred = !starred; onStar(starred); }}>⭐</button>
-      <button class="btn ai" title="カレンダー登録" style="--ac:var(--blue)" class:active={openPanels.has('calendar')} onclick={() => togglePanel('calendar')}>📅</button>
-      <button class="btn ai" title="AI要約" style="--ac:var(--green)" class:active={openPanels.has('summary')} onclick={() => togglePanel('summary')}>📝</button>
-      <button class="btn ai" title="返信下書き" style="--ac:var(--yellow)" class:active={openPanels.has('nuance')} onclick={() => togglePanel('nuance')}>✍</button>
-      <button class="btn ai" title="翻訳" style="--ac:var(--blue)" class:active={translatedBody !== null || translating} onclick={translateInline} disabled={translating}>{translating ? '⏳' : '🌐'}</button>
+      <Button icon="reply" label="返信" title="返信" onclick={onReply} />
+      <Button icon="forward" label="転送" title="転送" onclick={onForward} />
+      <span class="divider"></span>
+      <Button icon="archive" label="アーカイブ" title="アーカイブ" onclick={onArchive} />
+      <Button icon="trash" label="削除" variant="danger" title="削除" onclick={onDelete} />
+      <Button icon="star" label="スター" variant={starred ? 'starred' : ''} title="スター" onclick={() => { starred = !starred; onStar(starred); }} />
+      <span class="divider"></span>
+      <Button icon="summary" label="要約" variant="ai-summary" active={openPanels.has('summary')} title="AI要約" onclick={() => togglePanel('summary')} kbd="y" />
+      <Button icon="draft" label="下書き" variant="ai-draft" active={openPanels.has('nuance')} title="返信下書き" onclick={() => togglePanel('nuance')} kbd="d" />
+      <Button icon="translate" label="翻訳" variant="ai-translate" active={translatedBody !== null || translating} title="翻訳" onclick={translateInline} disabled={translating} kbd="t" />
+      <Button icon="calendar" label="カレンダー" variant="ai-calendar" active={openPanels.has('calendar')} title="カレンダー登録" onclick={() => togglePanel('calendar')} kbd="l" />
     </div>
 
     {#if mail.attachments.length > 0}
@@ -337,12 +349,8 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   .detail { flex:1;overflow-y:auto;padding:16px }
   .subject { font-size:16px;font-weight:700;margin-bottom:4px }
   .meta { color:var(--overlay);font-size:10px;margin-bottom:2px }
-  .actions { display:flex;gap:4px;margin:12px 0;flex-wrap:wrap }
-  .btn { padding:4px 8px;border-radius:6px;border:1px solid var(--surface1);background:var(--surface0);cursor:pointer;font-size:14px }
-  .btn:hover { border-color:var(--subtext) }
-  .btn.ai { border-color:var(--ac) }
-  .btn.ai.active { background:var(--ac) }
-  .btn.starred { background:var(--yellow) }
+  .actions { display:flex;gap:4px;margin:12px 0;flex-wrap:wrap;align-items:center }
+  .divider { width:1px;height:24px;background:var(--line, var(--surface1));margin:0 4px }
   .attachments { display:flex;gap:6px;margin:8px 0;flex-wrap:wrap }
   .att-chip { padding:4px 10px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px;cursor:pointer }
   .att-chip:hover { border-color:var(--mauve) }
@@ -371,4 +379,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   .fi { color:var(--overlay);font-size:10px;flex:1 }
   .bd { padding:6px 16px;border-radius:6px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);cursor:pointer;font-size:11px }
   .bd.primary { background:var(--mauve);color:var(--base);border:none;font-weight:700 }
+  .compact :global(.btn .label) { display:none }
+  .compact :global(.btn .kbd) { display:none }
+  .compact :global(.btn) { width:34px;padding:8px;justify-content:center }
 </style>

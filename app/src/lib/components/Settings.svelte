@@ -46,6 +46,12 @@
           <ShortcutTab bind:settings={local} />
         {:else if activeTab === 'display'}
           <h3>表示設定</h3>
+          <label class="fl">テーマ
+            <select bind:value={local.theme} onchange={() => document.documentElement.setAttribute('data-theme', local.theme)}>
+              <option value="dark">ダーク</option>
+              <option value="light">ライト</option>
+            </select>
+          </label>
           <label class="fl">日時形式
             <select bind:value={local.dateFormat}>
               <option value="YYYY/MM/DD HH:mm:ss">YYYY/MM/DD HH:mm:ss</option>
@@ -74,8 +80,8 @@
         {:else if activeTab === 'about'}
           <h3>SmartAM</h3>
           <div class="about-card">
-            <div class="about-logo">✉</div>
-            <div class="about-name">SmartAM</div>
+            <div class="about-logo"><span class="chi-mark"><span class="chi">智</span><span class="chi-bar"></span></span></div>
+            <div class="about-name">Smart<span class="am">AM</span></div>
             <div class="about-desc">AI-native Desktop Mail Client</div>
             <div class="about-ver">v0.1.10</div>
             <div class="about-info">
@@ -117,8 +123,12 @@
   .btn-sm { padding:4px 12px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px;cursor:pointer }
   .save-toast { color:var(--green);font-size:11px;margin-right:12px }
   .about-card { text-align:center;padding:24px 16px }
-  .about-logo { font-size:48px;margin-bottom:8px }
+  .about-logo { font-size:48px;margin-bottom:8px;display:flex;justify-content:center }
+  .chi-mark { display:inline-flex;flex-direction:column;align-items:center }
+  .chi-mark .chi { font-family:'Noto Sans JP',sans-serif;font-weight:900;font-size:48px;letter-spacing:-0.05em;color:var(--text);line-height:1 }
+  .chi-mark .chi-bar { width:90%;height:5px;background:var(--red);border-radius:2px;margin-top:-4px }
   .about-name { font-size:20px;font-weight:700;color:var(--text) }
+  .about-name .am { color:var(--red) }
   .about-desc { font-size:11px;color:var(--overlay);margin:4px 0 8px }
   .about-ver { font-size:13px;font-weight:700;color:var(--mauve);margin-bottom:16px }
   .about-info { font-size:10px;color:var(--overlay);line-height:1.8 }

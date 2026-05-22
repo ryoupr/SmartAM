@@ -8,20 +8,48 @@
 </script>
 
 {#if toast}
-  <div class="toast-bar">
+  <div class="toast">
     {toast.msg}
     {#if toast.undo}
-      <button class="undo" onclick={() => { toast?.undo?.(); onDismissToast(); }}>元に戻す</button>
+      <button class="undo" onclick={() => { toast?.undo?.(); onDismissToast(); }}>取り消す</button>
     {/if}
   </div>
 {/if}
 {#if error}
-  <div class="toast-err">{error} <button onclick={onDismissError}>✕</button></div>
+  <div class="toast err">
+    {error}
+    <button class="dismiss" onclick={onDismissError}>✕</button>
+  </div>
 {/if}
 
 <style>
-  .toast-bar { position:fixed;bottom:16px;right:16px;padding:10px 16px;background:#1e3a2e;color:var(--green);border:1px solid var(--green);border-radius:8px;font-size:12px;z-index:100;display:flex;gap:12px;align-items:center }
-  .undo { background:none;border:none;color:var(--blue);cursor:pointer;font-size:11px;text-decoration:underline }
-  .toast-err { position:fixed;bottom:56px;right:16px;padding:10px 16px;background:#3a1e1e;color:var(--red);border:1px solid var(--red);border-radius:8px;font-size:12px;z-index:100 }
-  .toast-err button { background:none;border:none;color:var(--red);cursor:pointer;margin-left:8px }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 12px 16px; border-radius: 8px;
+    background: var(--ink, #1a1410); color: var(--cream, #f6efe4);
+    border-left: 4px solid var(--ai-blue, var(--blue));
+    font-size: 12px; z-index: 100;
+    display: flex; gap: 12px; align-items: center;
+    box-shadow: var(--shadow-floating, 0 16px 36px rgba(26,20,16,0.18));
+    animation: slide-in 300ms ease-out;
+  }
+  .toast.err {
+    border-left-color: var(--red);
+    bottom: 72px;
+  }
+  .undo {
+    background: none; border: none;
+    color: var(--ai-blue, var(--blue));
+    cursor: pointer; font-size: 11px; font-weight: 600;
+    text-decoration: underline;
+  }
+  .dismiss {
+    background: none; border: none;
+    color: var(--cream, #f6efe4); cursor: pointer;
+    font-size: 14px; margin-left: 8px;
+  }
+  @keyframes slide-in {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
 </style>

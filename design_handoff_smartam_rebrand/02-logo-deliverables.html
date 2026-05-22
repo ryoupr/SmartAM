@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>SmartAM Logo · Final Deliverables</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --cream: #f6efe4;
+      --paper: #faf5e7;
+      --ink: #1a1410;
+      --red:  #c8281e;
+      --mauve: #cba6f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 56px 64px 80px;
+    }
+    a { color: inherit; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Top hero ───────────────────────────────────── */
+    .hero {
+      border-top: 6px solid var(--red);
+      padding-top: 28px;
+      margin-bottom: 56px;
+    }
+    .hero .crumb {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.15em;
+      opacity: 0.55; margin-bottom: 20px;
+    }
+    .hero .row {
+      display: flex; align-items: flex-end; gap: 36px;
+      flex-wrap: wrap;
+    }
+    .mark-outline {
+      display: inline-block; text-align: left;
+    }
+    .mark-outline .chi {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900; font-size: 200px;
+      line-height: 0.9; letter-spacing: -0.05em;
+      color: transparent;
+      -webkit-text-stroke: 5px var(--ink);
+    }
+    .mark-outline .bar {
+      margin-top: 4px;
+      height: 20px; width: 180px;
+      background: var(--red);
+    }
+    .hero h1 {
+      font-weight: 800; font-size: 64px;
+      letter-spacing: -0.03em; line-height: 1;
+      margin-bottom: 12px;
+    }
+    .hero h1 .am { color: var(--red); }
+    .hero .lead {
+      font-size: 17px; opacity: 0.7; max-width: 480px;
+      line-height: 1.55;
+    }
+
+    /* ── Section ───────────────────────────────── */
+    section {
+      border-top: 1px solid rgba(0,0,0,0.12);
+      padding-top: 36px;
+      margin-bottom: 48px;
+    }
+    h2 {
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.15em;
+      opacity: 0.65;
+      margin-bottom: 28px;
+      font-weight: 500;
+    }
+    h2 .num { color: var(--red); margin-right: 12px; font-weight: 700; }
+
+    /* ── Specs grid ───────────────────────────────── */
+    .specs {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+    }
+    .spec {
+      background: var(--paper);
+      padding: 28px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.07);
+    }
+    .spec h3 {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.12em;
+      opacity: 0.6;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .spec .v {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.7;
+    }
+    .spec .v b { font-weight: 700; }
+    .swatch-row { display: flex; gap: 12px; margin-top: 10px; }
+    .swatch-row .sw {
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    }
+    .swatch-row .sw i {
+      width: 28px; height: 28px; border-radius: 4px;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+      display: block;
+    }
+
+    /* ── App icon row ─────────────────────────────── */
+    .icon-row {
+      display: flex; gap: 28px; align-items: flex-end;
+      padding: 36px 28px;
+      background: var(--paper);
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.07);
+      overflow-x: auto;
+    }
+    .icon-slot {
+      display: flex; flex-direction: column; gap: 10px; align-items: center;
+      flex: 0 0 auto;
+    }
+    .icon-slot .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; opacity: 0.55; letter-spacing: 0.08em;
+    }
+    .sq {
+      border-radius: 22.37%;
+      background: var(--cream);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+      overflow: hidden;
+    }
+    .sq .chi-outline {
+      color: transparent;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      line-height: 0.9;
+    }
+    .sq .chi-filled {
+      color: var(--ink);
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      line-height: 0.9;
+    }
+    .sq .bar { background: var(--red); margin-top: 4%; }
+
+    /* ── Wordmark ───────────────────────────────── */
+    .lockup {
+      display: flex; align-items: flex-end; gap: 24px;
+      padding: 36px 28px;
+      background: var(--paper);
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.07);
+    }
+    .lockup .wordmark {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 48px;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .lockup .wordmark .am { color: var(--red); }
+    .lockup .tag {
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      opacity: 0.55;
+      letter-spacing: 0.1em;
+    }
+    .lockup .mini-mark .chi {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900;
+      font-size: 72px;
+      line-height: 0.9;
+      letter-spacing: -0.05em;
+      color: transparent;
+      -webkit-text-stroke: 2.5px var(--ink);
+    }
+    .lockup .mini-mark .bar {
+      height: 8px; width: 65px;
+      background: var(--red); margin-top: 2px;
+    }
+
+    /* ── Downloads ───────────────────────────────── */
+    .downloads {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .dl {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--paper);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .dl:hover {
+      background: var(--ink);
+      color: var(--paper);
+      transform: translateY(-1px);
+    }
+    .dl .arrow { opacity: 0.5; }
+    .dl-group-title {
+      font-size: 12px; font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.1em; opacity: 0.55;
+      margin: 24px 0 14px; font-weight: 500;
+    }
+    .dl-group-title:first-child { margin-top: 0; }
+
+    /* ── Instructions ──────────────────────────── */
+    .instructions {
+      background: var(--ink);
+      color: var(--cream);
+      padding: 32px 36px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .instructions h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--red);
+    }
+    .instructions code {
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .instructions ol { padding-left: 20px; }
+    .instructions ol li { margin-bottom: 8px; }
+
+    /* ── Context: dock, banner, sidebar ─────── */
+    .ctx-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .ctx-card {
+      background: var(--paper);
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .ctx-card h4 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      opacity: 0.55;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .dock-wrap {
+      background: linear-gradient(180deg, #4a5b8a 0%, #2a3a5a 100%);
+      padding: 24px 20px 14px;
+      border-radius: 12px;
+      display: flex; justify-content: center;
+    }
+    .dock {
+      background: rgba(20,20,30,0.55);
+      backdrop-filter: blur(20px);
+      padding: 8px; border-radius: 14px;
+      display: flex; gap: 6px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .dock .app { width: 40px; height: 40px; border-radius: 9px; }
+    .sidebar-mock {
+      background: #1e1e2e;
+      padding: 14px 16px;
+      border-radius: 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sidebar-mock .name {
+      color: #cdd6f4;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700; font-size: 14px;
+      letter-spacing: -0.02em;
+    }
+    .sidebar-mock .ver {
+      margin-left: auto;
+      color: #a6adc8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+    }
+
+    .readme-preview {
+      background: var(--cream);
+      border: 1px solid rgba(0,0,0,0.1);
+      border-radius: 8px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .readme-preview::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: var(--red);
+    }
+    .readme-preview .row {
+      display: flex; align-items: flex-end; gap: 24px;
+    }
+    .readme-preview .wm {
+      font-weight: 800; font-size: 36px; letter-spacing: -0.03em;
+      line-height: 1; padding-bottom: 6px;
+    }
+    .readme-preview .wm .am { color: var(--red); }
+    .readme-preview .desc {
+      margin-top: 8px; font-size: 12px; opacity: 0.7;
+      line-height: 1.5; max-width: 320px;
+    }
+    .readme-preview .meta {
+      margin-top: 18px;
+      display: flex; gap: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; opacity: 0.55; letter-spacing: 0.1em;
+    }
+
+    /* ── Footer ───────────────────────────────── */
+    footer {
+      text-align: center; padding: 40px 0 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; opacity: 0.45; letter-spacing: 0.1em;
+    }
+
+    /* Hidden canvas for rendering exports */
+    #render-canvas { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="crumb">SMARTAM · LOGO · FINAL DELIVERABLE</div>
+      <div class="row">
+        <div class="mark-outline">
+          <div class="chi">智</div>
+          <div class="bar"></div>
+        </div>
+        <div style="flex: 1; min-width: 240px;">
+          <h1>Smart<span class="am">AM</span></h1>
+          <p class="lead">「智」アウトライン × レッドバー。AI ネイティブメーラー SmartAM の決定稿ロゴ。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 01 SPECS -->
+    <section>
+      <h2><span class="num">01</span>SPECIFICATIONS</h2>
+      <div class="specs">
+        <div class="spec">
+          <h3>CHARACTER</h3>
+          <div class="v">智 · <b>CHI</b> ／ ちえ・さとし<br>
+          意味: <b>wisdom / smart</b><br>
+          Smart の漢字直訳。Smart<b>AM</b> の Smart 部分の表象。</div>
+        </div>
+        <div class="spec">
+          <h3>TYPEFACE</h3>
+          <div class="v">
+            <b>Noto Sans JP · Black 900</b><br>
+            字間: -0.05em<br>
+            アウトライン: stroke 2.5% of font-size
+          </div>
+        </div>
+        <div class="spec">
+          <h3>COLORS</h3>
+          <div class="swatch-row">
+            <div class="sw"><i style="background: var(--cream);"></i>#F6EFE4 Cream</div>
+            <div class="sw"><i style="background: var(--ink);"></i>#1A1410 Ink</div>
+            <div class="sw"><i style="background: var(--red);"></i>#C8281E Red</div>
+          </div>
+        </div>
+        <div class="spec">
+          <h3>BAR PROPORTIONS</h3>
+          <div class="v">
+            幅: <b>90%</b> of 智-glyph width<br>
+            高さ: <b>10%</b> of font-size<br>
+            上余白: <b>2%</b> of font-size
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 APP ICON -->
+    <section>
+      <h2><span class="num">02</span>APP ICON (macOS squircle)</h2>
+      <div class="icon-row" id="icon-row"></div>
+    </section>
+
+    <!-- 03 WORDMARK -->
+    <section>
+      <h2><span class="num">03</span>WORDMARK · LOCKUP</h2>
+      <div class="lockup">
+        <div class="mini-mark">
+          <div class="chi">智</div>
+          <div class="bar"></div>
+        </div>
+        <div>
+          <div class="wordmark">Smart<span class="am">AM</span></div>
+          <div class="tag">━ 智 · CHI · AI-NATIVE MAIL</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 IN CONTEXT -->
+    <section>
+      <h2><span class="num">04</span>IN CONTEXT</h2>
+      <div class="ctx-grid">
+        <div class="ctx-card">
+          <h4>MACOS DOCK</h4>
+          <div class="dock-wrap">
+            <div class="dock">
+              <div class="app" style="background: linear-gradient(135deg,#4a90e2,#2e5cb8);"></div>
+              <div class="app" style="background: linear-gradient(135deg,#34c759,#1d8a3a);"></div>
+              <div class="app" style="background: linear-gradient(135deg,#ff3b30,#b71c1c);"></div>
+              <div class="app sq" id="dock-icon" style="background: var(--cream); width: 40px; height: 40px; padding: 6px;">
+                <div class="chi-outline" style="font-size: 22px; -webkit-text-stroke: 1px var(--ink);">智</div>
+                <div class="bar" style="height: 3px; width: 18px;"></div>
+              </div>
+              <div class="app" style="background: linear-gradient(135deg,#ff9500,#cc6f00);"></div>
+              <div class="app" style="background: linear-gradient(135deg,#5856d6,#3a3aa0);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="ctx-card">
+          <h4>APP TITLE BAR</h4>
+          <div class="sidebar-mock">
+            <div class="mini-mark" style="transform: scale(0.32); transform-origin: left center; margin-right: -64px;">
+              <div class="chi" style="-webkit-text-stroke-color: #cdd6f4;">智</div>
+              <div class="bar"></div>
+            </div>
+            <span class="name">SmartAM</span>
+            <span class="ver">v0.1.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 24px"></div>
+
+      <div class="readme-preview">
+        <div class="row">
+          <div class="mini-mark">
+            <div class="chi">智</div>
+            <div class="bar"></div>
+          </div>
+          <div>
+            <div class="wm">Smart<span class="am">AM</span></div>
+            <p class="desc">AI をネイティブに統合した macOS デスクトップメーラー。要約、返信下書き、翻訳、カレンダー登録を、ワンキーで。</p>
+            <div class="meta">
+              <span>━ TAURI v2</span>
+              <span>━ SVELTEKIT</span>
+              <span>━ MIT</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 DOWNLOADS -->
+    <section>
+      <h2><span class="num">05</span>DOWNLOAD</h2>
+
+      <div class="dl-group-title">━ SVG · ベクター（ブラウザ／ベクター編集ソフト）</div>
+      <div class="downloads">
+        <a class="dl" href="smartam-logo.svg" download>
+          <span>smartam-logo.svg</span><span class="arrow">↓</span>
+        </a>
+        <a class="dl" href="smartam-logo-filled.svg" download>
+          <span>smartam-logo-filled.svg</span><span class="arrow">↓</span>
+        </a>
+        <a class="dl" href="favicon.svg" download>
+          <span>favicon.svg (16-32px)</span><span class="arrow">↓</span>
+        </a>
+      </div>
+
+      <div class="dl-group-title">━ PNG · ラスター（Tauri アプリアイコン用）</div>
+      <div class="downloads" id="png-downloads"></div>
+
+      <div class="dl-group-title">━ README BANNER</div>
+      <div class="downloads">
+        <button class="dl" data-export="banner" data-size="1280x420">
+          <span>banner-1280x420.png</span><span class="arrow">↓</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 06 INSTALL -->
+    <section>
+      <h2><span class="num">06</span>INSTALLATION GUIDE</h2>
+      <div class="instructions">
+        <h3>SmartAM プロジェクトへの組み込み手順</h3>
+        <ol>
+          <li>上記の PNG ボタンを順番にクリック → 全サイズダウンロード</li>
+          <li>ダウンロードした PNG を <code>app/src-tauri/icons/</code> 配下の同名ファイルに上書き
+            <ul style="padding-left: 18px; margin-top: 4px; opacity: 0.85;">
+              <li>icon.png (1024 → 1024)</li>
+              <li>128x128.png / 128x128@2x.png / 32x32.png</li>
+              <li>Square*Logo.png は Windows 用なので、しばらく未使用なら後回しで OK</li>
+            </ul>
+          </li>
+          <li><code>favicon.svg</code> を <code>app/src/lib/assets/favicon.svg</code> に上書き（現在 Svelte の初期テンプレート）</li>
+          <li>icon.icns は <code>iconutil -c icns icon.iconset</code> で再生成（macOS）。次のターンでコマンドを案内可能</li>
+          <li><code>app/src-tauri/tauri.conf.json</code> の <code>bundle.icon</code> パスは現状のまま使い回し可</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>SMARTAM · 智 · OUTLINE · RED BAR — Generated <span id="ts"></span></footer>
+  </div>
+
+  <canvas id="render-canvas"></canvas>
+
+  <script>
+    // ── Generate the squircle icon row (varying sizes) ────────────────
+    document.getElementById('ts').textContent = new Date().toISOString().split('T')[0];
+
+    function buildSquircle(size) {
+      const small = size <= 32;
+      const sq = document.createElement('div');
+      sq.className = 'sq';
+      sq.style.width  = size + 'px';
+      sq.style.height = size + 'px';
+      const chi = document.createElement('div');
+      // For very small sizes, the outline becomes illegible — switch to filled.
+      chi.className = small ? 'chi-filled' : 'chi-outline';
+      chi.textContent = '智';
+      const fs = size * 0.65;
+      chi.style.fontSize = fs + 'px';
+      if (!small) {
+        chi.style.webkitTextStroke = Math.max(1, size * 0.025) + 'px var(--ink)';
+      }
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = (size * 0.06) + 'px';
+      bar.style.width  = (size * 0.50) + 'px';
+      sq.appendChild(chi);
+      sq.appendChild(bar);
+      return sq;
+    }
+
+    const sizes = [1024, 256, 128, 88, 56, 32, 16];
+    const iconRow = document.getElementById('icon-row');
+    sizes.forEach(sz => {
+      const slot = document.createElement('div');
+      slot.className = 'icon-slot';
+      // Cap display height so the 1024px doesn't blow up the page
+      const display = Math.min(sz, 128);
+      const wrap = document.createElement('div');
+      wrap.appendChild(buildSquircle(display));
+      slot.appendChild(wrap);
+      const lbl = document.createElement('div');
+      lbl.className = 'label';
+      lbl.textContent = sz + ' px';
+      slot.appendChild(lbl);
+      iconRow.appendChild(slot);
+    });
+
+    // ── PNG download buttons ─────────────────────────────────────────
+    const pngSizes = [
+      { name: 'icon.png',          size: 1024 },
+      { name: '128x128@2x.png',    size: 256  },
+      { name: '128x128.png',       size: 128  },
+      { name: '32x32.png',         size: 32   },
+      { name: 'icon-16.png',       size: 16   },
+    ];
+    const dlContainer = document.getElementById('png-downloads');
+    pngSizes.forEach(({ name, size }) => {
+      const btn = document.createElement('button');
+      btn.className = 'dl';
+      btn.dataset.export = 'icon';
+      btn.dataset.size = size;
+      btn.dataset.filename = name;
+      btn.innerHTML = `<span>${name} <small style="opacity:.5">(${size}px)</small></span><span class="arrow">↓</span>`;
+      dlContainer.appendChild(btn);
+    });
+
+    // ── Canvas renderer: draw the squircle icon at any size ─────────
+    async function renderIconToCanvas(size) {
+      await document.fonts.load(`900 ${size * 0.65}px "Noto Sans JP"`);
+      const canvas = document.getElementById('render-canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+
+      const r = size * 0.2237;
+      // Cream rounded-rect background
+      ctx.fillStyle = '#f6efe4';
+      roundRect(ctx, 0, 0, size, size, r);
+      ctx.fill();
+
+      const small = size <= 32;
+      // 智 character
+      const fs = size * 0.65;
+      ctx.font = `900 ${fs}px "Noto Sans JP", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Offset upward so there's room for the bar below
+      const cx = size / 2;
+      const cy = size / 2 - size * 0.05;
+      if (small) {
+        ctx.fillStyle = '#1a1410';
+        ctx.fillText('智', cx, cy);
+      } else {
+        ctx.strokeStyle = '#1a1410';
+        ctx.lineWidth = Math.max(1, size * 0.025);
+        ctx.lineJoin = 'round';
+        ctx.strokeText('智', cx, cy);
+      }
+      // Red bar
+      const bw = size * 0.50, bh = size * 0.06;
+      ctx.fillStyle = '#c8281e';
+      ctx.fillRect((size - bw) / 2, cy + fs * 0.35, bw, bh);
+    }
+
+    async function renderBannerToCanvas() {
+      await document.fonts.load('900 200px "Noto Sans JP"');
+      await document.fonts.load('800 100px "Inter"');
+      const W = 1280, H = 420;
+      const canvas = document.getElementById('render-canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // Cream background
+      ctx.fillStyle = '#f6efe4';
+      ctx.fillRect(0, 0, W, H);
+      // Red top stripe
+      ctx.fillStyle = '#c8281e';
+      ctx.fillRect(0, 0, W, 10);
+
+      // Outline 智
+      ctx.font = '900 240px "Noto Sans JP"';
+      ctx.textBaseline = 'alphabetic';
+      ctx.strokeStyle = '#1a1410';
+      ctx.lineWidth = 8;
+      ctx.lineJoin = 'round';
+      ctx.strokeText('智', 80, 270);
+      // Red bar under 智
+      ctx.fillStyle = '#c8281e';
+      ctx.fillRect(80, 280, 220, 22);
+
+      // Wordmark "SmartAM"
+      ctx.font = '800 92px "Inter"';
+      ctx.fillStyle = '#1a1410';
+      ctx.fillText('Smart', 360, 230);
+      const smartW = ctx.measureText('Smart').width;
+      ctx.fillStyle = '#c8281e';
+      ctx.fillText('AM', 360 + smartW, 230);
+
+      // Description
+      ctx.font = '500 22px "Inter"';
+      ctx.fillStyle = 'rgba(26,20,16,0.7)';
+      ctx.fillText('AI をネイティブに統合した macOS デスクトップメーラー。', 360, 280);
+
+      // Meta line
+      ctx.font = '500 16px "JetBrains Mono"';
+      ctx.fillStyle = 'rgba(26,20,16,0.55)';
+      ctx.fillText('━ TAURI v2     ━ SVELTEKIT     ━ MIT', 360, 340);
+
+      // Version on right
+      ctx.textAlign = 'right';
+      ctx.fillText('v0.1.0 · 智 · CHI', W - 64, 340);
+      ctx.textAlign = 'left';
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    async function downloadCanvas(filename) {
+      const canvas = document.getElementById('render-canvas');
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Click handler
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.dl[data-export]');
+      if (!btn) return;
+      e.preventDefault();
+      if (btn.dataset.export === 'icon') {
+        const size = parseInt(btn.dataset.size, 10);
+        await renderIconToCanvas(size);
+        await downloadCanvas(btn.dataset.filename);
+      } else if (btn.dataset.export === 'banner') {
+        await renderBannerToCanvas();
+        await downloadCanvas('smartam-banner.png');
+      }
+    });
+  </script>
+</body>
+</html>

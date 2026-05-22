@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>SmartAM · App UI Sample (Light)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* ── Light brand palette ─────────────────────── */
+      --cream:    #f6efe4;   /* canvas */
+      --paper:    #faf5e7;   /* sub-panels */
+      --bone:     #ece5d5;   /* hover / pressed wells */
+      --paperWh:  #fffaf0;   /* cards / inputs */
+      --line:     rgba(26,20,16,0.10);
+      --line-2:   rgba(26,20,16,0.18);
+
+      --ink:      #1a1410;   /* primary text + mark */
+      --ink-80:   #1a1410cc;
+      --ink-60:   #1a141099;
+      --ink-40:   #1a141066;
+      --ink-20:   #1a141033;
+
+      --red:      #c8281e;   /* brand primary */
+      --red-deep: #a02019;   /* hover */
+      --red-light:#fde4e1;   /* tint bg */
+
+      /* AI feature colors — saturated, readable on cream */
+      --ai-green:  #2f7a3b;
+      --ai-green-bg: #e3f1de;
+      --ai-yellow: #a06f0a;
+      --ai-yellow-bg: #faecca;
+      --ai-blue:   #1d5fb3;
+      --ai-blue-bg: #dde9f9;
+      --ai-mauve:  #7c3eb5;
+      --ai-mauve-bg: #ecdcf9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #efe7d4; /* slightly darker than cream so the window stands out */
+      color: var(--ink);
+      min-height: 100vh;
+      min-width: 1504px;
+      padding: 32px;
+      font-feature-settings: "ss01" on;
+    }
+    /* ── Page header ──────────────────────────── */
+    .page-header {
+      width: 1440px;
+      margin: 0 auto 24px;
+      display: flex; align-items: center; gap: 24px;
+    }
+    .page-header .brand .chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 56px; line-height: 0.9; letter-spacing: -0.05em;
+      color: transparent; -webkit-text-stroke: 2px var(--ink);
+      display: inline-block;
+    }
+    .page-header .brand .bar { height: 6px; width: 52px; background: var(--red); margin-top: 2px; }
+    .page-header h1 { font-weight: 800; font-size: 24px; letter-spacing: -0.02em; }
+    .page-header h1 .am { color: var(--red); }
+    .page-header .crumb {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.15em;
+      opacity: 0.55;
+    }
+
+    /* ── Window chrome ─────────────────────────── */
+    .window {
+      width: 1440px;
+      margin: 0 auto;
+      background: var(--cream);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(26,20,16,0.18), 0 0 0 1px rgba(26,20,16,0.08);
+      display: grid;
+      grid-template-rows: 36px 1fr;
+    }
+    .titlebar {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      display: flex; align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      user-select: none;
+    }
+    .traffic { display: flex; gap: 8px; }
+    .traffic span {
+      width: 12px; height: 12px; border-radius: 50%; display: block;
+    }
+    .traffic span:nth-child(1) { background: #ff5f57; }
+    .traffic span:nth-child(2) { background: #febc2e; }
+    .traffic span:nth-child(3) { background: #28c840; }
+    .titlebar .center {
+      flex: 1;
+      display: flex; justify-content: center; align-items: center; gap: 8px;
+      font-size: 12px;
+      color: var(--ink-60);
+    }
+    .titlebar .center .mini-mark {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .titlebar .center .mini-chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 16px; line-height: 1;
+      color: transparent; -webkit-text-stroke: 1px var(--ink);
+      letter-spacing: -0.05em;
+    }
+    .titlebar .center .mini-bar { height: 3px; width: 14px; background: var(--red); margin-top: 1px; }
+    .titlebar .center strong { color: var(--ink); font-weight: 700; letter-spacing: -0.01em; }
+
+    /* ── 3-pane layout ─────────────────────────── */
+    .panes {
+      display: grid;
+      grid-template-columns: 240px 380px 1fr;
+      height: 820px;
+    }
+    .pane { overflow-y: auto; }
+    .pane::-webkit-scrollbar { width: 6px; }
+    .pane::-webkit-scrollbar-thumb { background: var(--ink-20); border-radius: 3px; }
+    .pane::-webkit-scrollbar-track { background: transparent; }
+
+    /* ── Sidebar ───────────────────────────────── */
+    .sidebar {
+      background: var(--paper);
+      border-right: 1px solid var(--line);
+      padding: 16px 12px;
+      display: flex; flex-direction: column;
+    }
+    .sidebar .head-mark {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 8px 14px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+    .sidebar .head-mark .chi {
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 26px; line-height: 0.9; letter-spacing: -0.05em;
+      color: transparent; -webkit-text-stroke: 1.2px var(--ink);
+    }
+    .sidebar .head-mark .bar { height: 3px; width: 22px; background: var(--red); margin-top: 1px; }
+    .sidebar .head-mark .info { flex: 1; }
+    .sidebar .head-mark .info .name {
+      font-weight: 700; font-size: 14px; letter-spacing: -0.01em;
+    }
+    .sidebar .head-mark .info .name .am { color: var(--red); }
+    .sidebar .head-mark .info .ver {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; color: var(--ink-60); letter-spacing: 0.1em;
+    }
+    .account-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px;
+      background: var(--paperWh);
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+    .account-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ai-green); }
+    .account-chip.alt { background: transparent; border-color: transparent; color: var(--ink-60); }
+    .account-chip.alt .dot { background: var(--ink-40); }
+    .account-chip .email { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-chip .arrow { color: var(--ink-40); font-size: 10px; }
+
+    .sidebar-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.15em;
+      color: var(--ink-40); padding: 14px 10px 6px; font-weight: 500;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 10px; border-radius: 5px;
+      font-size: 13px;
+      color: var(--ink-80);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .nav-item:hover { background: var(--bone); }
+    .nav-item.active {
+      background: var(--ink); color: var(--cream); font-weight: 600;
+    }
+    .nav-item .ico { font-size: 14px; opacity: 0.9; width: 18px; text-align: center; }
+    .nav-item .count {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-40);
+    }
+    .nav-item.active .count { color: var(--red); font-weight: 700; }
+
+    .llm-badge {
+      margin-top: auto;
+      padding: 10px 12px;
+      background: var(--paperWh);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--ink-80);
+      display: flex; align-items: center; gap: 8px;
+      letter-spacing: 0.04em;
+    }
+    .llm-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ai-blue); }
+    .llm-badge .gear { margin-left: auto; opacity: 0.5; cursor: pointer; }
+
+    /* ── Mail list ──────────────────────────────── */
+    .maillist {
+      background: var(--cream);
+      border-right: 1px solid var(--line);
+      display: flex; flex-direction: column;
+    }
+    .ml-head {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--cream);
+    }
+    .ml-head .top {
+      display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+    }
+    .ml-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+    .ml-head .count {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--ink-40); letter-spacing: 0.08em;
+    }
+    .ml-head .sync {
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .ml-head .sync .refresh {
+      width: 26px; height: 26px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--ink-60);
+      transition: background 0.1s;
+    }
+    .ml-head .sync .refresh:hover { background: var(--bone); }
+    .search {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--paperWh);
+      border-radius: 6px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      transition: border-color 0.15s;
+    }
+    .search:focus-within { border-color: var(--red); }
+    .search input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--ink); font-size: 12px;
+      font-family: 'Inter', sans-serif;
+    }
+    .search input::placeholder { color: var(--ink-40); }
+    .search .kbd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-60);
+      padding: 1px 5px; background: var(--paper); border-radius: 3px;
+      border: 1px solid var(--line);
+    }
+
+    .ml-list { flex: 1; overflow-y: auto; background: var(--cream); }
+    .ml-item {
+      padding: 12px 16px 12px 13px;
+      border-bottom: 1px solid var(--line);
+      border-left: 3px solid transparent;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .ml-item:hover { background: var(--paper); }
+    .ml-item.unread { border-left-color: var(--red); }
+    .ml-item.active {
+      background: var(--paperWh);
+      border-left-color: var(--red);
+      box-shadow: inset -3px 0 0 var(--ink);
+    }
+    .ml-item .row1 {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+    }
+    .ml-item .from {
+      font-weight: 600; font-size: 13px; flex: 1;
+      letter-spacing: -0.01em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ml-item.read .from { font-weight: 400; color: var(--ink-60); }
+    .ml-item .time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-40);
+    }
+    .ml-item .star { color: var(--ai-yellow); font-size: 12px; }
+    .ml-item .subject {
+      font-size: 13px; font-weight: 500; margin-bottom: 2px;
+      letter-spacing: -0.005em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ml-item.read .subject { font-weight: 400; color: var(--ink-80); }
+    .ml-item .preview {
+      font-size: 12px; color: var(--ink-60); line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .ml-item .badges { margin-top: 6px; display: flex; gap: 5px; align-items: center; }
+    .ml-item .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; letter-spacing: 0.05em;
+      padding: 2px 6px; border-radius: 3px;
+      background: var(--bone); color: var(--ink-60);
+    }
+    .ml-item .badge.attach { background: var(--ai-yellow-bg); color: var(--ai-yellow); }
+    .ml-item .badge.summary { background: var(--ai-green-bg); color: var(--ai-green); }
+
+    /* ── Mail detail ───────────────────────────── */
+    .detail { background: var(--cream); display: flex; flex-direction: column; }
+    .detail-toolbar {
+      padding: 12px 24px;
+      display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper);
+    }
+    .tb-btn {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--paperWh);
+      color: var(--ink);
+      border: 1.5px solid var(--line-2);
+      font-size: 14px; cursor: pointer;
+      transition: all 0.12s;
+    }
+    .tb-btn:hover { background: var(--bone); }
+    .tb-btn.ai-summary  { border-color: var(--ai-green);  color: var(--ai-green); }
+    .tb-btn.ai-draft    { border-color: var(--ai-yellow); color: var(--ai-yellow); }
+    .tb-btn.ai-translate{ border-color: var(--ai-blue);   color: var(--ai-blue); }
+    .tb-btn.ai-calendar { border-color: var(--ai-blue);   color: var(--ai-blue); }
+    .tb-btn.ai-summary.active { background: var(--ai-green); color: var(--paperWh); border-color: var(--ai-green); }
+    .tb-btn.starred { border-color: var(--ai-yellow); color: var(--ai-yellow); }
+    .tb-btn.danger:hover { border-color: var(--red); color: var(--red); }
+    .tb-divider {
+      width: 1px; height: 22px; background: var(--line-2); margin: 0 4px;
+    }
+    .tb-spacer { flex: 1; }
+
+    .mail-body { flex: 1; overflow-y: auto; padding: 28px 36px; background: var(--cream); }
+    .mail-head {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 22px;
+    }
+    .mail-head .avatar {
+      width: 46px; height: 46px; border-radius: 50%;
+      background: linear-gradient(135deg, #c8281e, #7c3eb5);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 17px; color: var(--cream);
+      flex: 0 0 46px;
+    }
+    .mail-head .info { flex: 1; min-width: 0; }
+    .mail-head .info h1 {
+      font-size: 24px; font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1.25;
+      margin-bottom: 10px;
+    }
+    .mail-head .info .from { font-size: 13px; color: var(--ink-80); }
+    .mail-head .info .from b { font-weight: 600; color: var(--ink); }
+    .mail-head .info .from .addr { color: var(--ink-60); }
+    .mail-head .info .meta {
+      margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-40); letter-spacing: 0.05em;
+    }
+    .mail-head .star {
+      margin-left: auto; font-size: 18px; color: var(--ai-yellow); cursor: pointer;
+    }
+
+    /* ── AI Summary panel ──────────────────────── */
+    .ai-panel {
+      background: var(--ai-green-bg);
+      border: 1px solid var(--ai-green);
+      border-radius: 10px;
+      padding: 18px 22px;
+      margin-bottom: 24px;
+    }
+    .ai-panel .head {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .ai-panel .head .ico {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--ai-green); color: var(--paperWh);
+      font-size: 13px;
+    }
+    .ai-panel .head .ttl {
+      font-weight: 700; font-size: 13px; letter-spacing: -0.01em;
+      color: var(--ai-green);
+    }
+    .ai-panel .head .model {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-60); letter-spacing: 0.05em;
+    }
+    .ai-panel .head .regen {
+      width: 26px; height: 26px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ai-mauve); cursor: pointer;
+      background: var(--paperWh);
+      transition: background 0.12s;
+    }
+    .ai-panel .head .regen:hover { background: var(--ai-mauve-bg); }
+    .ai-panel ul {
+      list-style: none; padding: 0;
+      font-size: 13px; line-height: 1.6; color: var(--ink);
+    }
+    .ai-panel ul li {
+      padding-left: 18px; position: relative;
+      margin-bottom: 4px;
+    }
+    .ai-panel ul li::before {
+      content: "━"; position: absolute; left: 0;
+      color: var(--ai-green);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      top: 5px;
+    }
+    .ai-panel .actions {
+      margin-top: 14px;
+      display: flex; gap: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    }
+    .ai-panel .actions .a {
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: var(--paperWh); color: var(--ink-80);
+      cursor: pointer; letter-spacing: 0.05em;
+      border: 1px solid var(--line);
+    }
+    .ai-panel .actions .a:hover { background: var(--paper); border-color: var(--ink-40); }
+
+    /* Mail body text */
+    .body-text {
+      font-size: 14.5px; line-height: 1.8; color: var(--ink);
+      max-width: 680px;
+    }
+    .body-text p { margin-bottom: 14px; }
+    .body-text strong { background: var(--ai-yellow-bg); padding: 0 4px; border-radius: 2px; color: var(--ink); }
+    .body-text .sig {
+      margin-top: 28px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--line);
+      color: var(--ink-60); font-size: 12px; line-height: 1.6;
+    }
+
+    /* attachments */
+    .attachments {
+      display: flex; gap: 10px; margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+    .attach {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--paperWh); border-radius: 8px;
+      border: 1px solid var(--line);
+      cursor: pointer; transition: all 0.12s;
+    }
+    .attach:hover { background: var(--paper); border-color: var(--ink-40); }
+    .attach .ico {
+      width: 30px; height: 36px;
+      background: var(--ai-blue); color: var(--paperWh); border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      font-weight: 700;
+    }
+    .attach .ico.fig { background: var(--ai-mauve); }
+    .attach .name { font-size: 13px; font-weight: 500; }
+    .attach .size {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-40);
+    }
+
+    /* ── Toast (floating) ──────────────────────── */
+    .toast {
+      position: absolute; right: 24px; bottom: 24px;
+      background: var(--ink); color: var(--cream);
+      padding: 12px 16px; border-radius: 8px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 13px;
+      box-shadow: 0 10px 28px rgba(26,20,16,0.30);
+      border-left: 4px solid var(--ai-blue);
+      max-width: 320px;
+      animation: slide-in 0.3s ease-out;
+    }
+    .toast .undo {
+      color: var(--ai-blue); cursor: pointer;
+      font-size: 12px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px;
+      letter-spacing: -0.005em;
+    }
+    .toast .undo:hover { background: rgba(255,255,255,0.06); }
+    @keyframes slide-in {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ── Notes section below window ───────────── */
+    .notes {
+      width: 1440px; margin: 36px auto 0;
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+    }
+    .note-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .note-card h4 {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.12em; color: var(--red); margin-bottom: 8px; font-weight: 600;
+    }
+    .note-card p { font-size: 12.5px; line-height: 1.55; color: var(--ink-80); }
+    .note-card code {
+      background: var(--paperWh); padding: 1px 5px; border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--red); border: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <!-- ── Page Header ─────────────────────────────── -->
+  <div class="page-header">
+    <div class="brand">
+      <div class="chi">智</div>
+      <div class="bar"></div>
+    </div>
+    <h1>Smart<span class="am">AM</span> · App UI Sample</h1>
+    <div class="crumb">DESIGN SYSTEM APPLIED · LIGHT THEME</div>
+  </div>
+
+  <!-- ── Mail Client Window ──────────────────────── -->
+  <div class="window">
+    <!-- titlebar -->
+    <div class="titlebar">
+      <div class="traffic"><span></span><span></span><span></span></div>
+      <div class="center">
+        <div class="mini-mark">
+          <span class="mini-chi">智</span>
+          <span class="mini-bar"></span>
+        </div>
+        <strong>SmartAM</strong>
+        <span style="opacity: 0.55;">— 受信トレイ</span>
+      </div>
+    </div>
+
+    <div class="panes">
+
+      <!-- ── Sidebar ───────────────────────── -->
+      <div class="pane sidebar">
+        <div class="head-mark">
+          <div>
+            <div class="chi">智</div>
+            <div class="bar"></div>
+          </div>
+          <div class="info">
+            <div class="name">Smart<span class="am">AM</span></div>
+            <div class="ver">v0.1.0</div>
+          </div>
+        </div>
+
+        <div class="account-chip">
+          <span class="dot"></span>
+          <span class="email">ryo@example.com</span>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="account-chip alt">
+          <span class="dot"></span>
+          <span class="email">work@company.co.jp</span>
+        </div>
+
+        <div class="sidebar-section-title">━ FOLDERS</div>
+        <div class="nav-item active"><span class="ico">📥</span><span>受信トレイ</span><span class="count">24</span></div>
+        <div class="nav-item"><span class="ico">⭐</span><span>スター付き</span><span class="count">3</span></div>
+        <div class="nav-item"><span class="ico">📤</span><span>送信済み</span></div>
+        <div class="nav-item"><span class="ico">📝</span><span>下書き</span><span class="count">2</span></div>
+        <div class="nav-item"><span class="ico">📦</span><span>アーカイブ</span></div>
+        <div class="nav-item"><span class="ico">🗑</span><span>ゴミ箱</span></div>
+
+        <div class="sidebar-section-title">━ LABELS</div>
+        <div class="nav-item"><span class="ico" style="color: var(--red);">●</span><span>緊急</span><span class="count">2</span></div>
+        <div class="nav-item"><span class="ico" style="color: var(--ai-blue);">●</span><span>仕事</span><span class="count">12</span></div>
+        <div class="nav-item"><span class="ico" style="color: var(--ai-green);">●</span><span>個人</span></div>
+
+        <div class="llm-badge">
+          <span class="dot"></span>
+          <span>claude-3-5-sonnet</span>
+          <span class="gear">⚙</span>
+        </div>
+      </div>
+
+      <!-- ── Mail List ─────────────────────── -->
+      <div class="pane maillist">
+        <div class="ml-head">
+          <div class="top">
+            <h2>受信トレイ</h2>
+            <span class="count">24 件 · 新着 5</span>
+            <span class="sync">
+              <span class="refresh">↻</span>
+            </span>
+          </div>
+          <div class="search">
+            <span style="opacity: 0.6;">🔍</span>
+            <input type="text" placeholder="検索…" />
+            <span class="kbd">/</span>
+          </div>
+        </div>
+
+        <div class="ml-list">
+          <!-- Active item -->
+          <div class="ml-item active unread">
+            <div class="row1">
+              <span class="from">山田 太郎</span>
+              <span class="star">⭐</span>
+              <span class="time">14:32</span>
+            </div>
+            <div class="subject">明日のミーティングについて — 日程再調整のお願い</div>
+            <div class="preview">お疲れさまです。来週の打ち合わせの日程を再調整させてください。火曜日もしくは水曜日午後はいかがでしょうか…</div>
+            <div class="badges">
+              <span class="badge attach">📎 2</span>
+              <span class="badge summary">📝 要約済み</span>
+            </div>
+          </div>
+
+          <div class="ml-item unread">
+            <div class="row1">
+              <span class="from">Anthropic Docs</span>
+              <span class="time">13:08</span>
+            </div>
+            <div class="subject">Claude 4 release notes — new capabilities</div>
+            <div class="preview">We're excited to share what's new in Claude 4: improved reasoning, longer context windows, better code understanding…</div>
+          </div>
+
+          <div class="ml-item read">
+            <div class="row1">
+              <span class="from">GitHub</span>
+              <span class="time">12:01</span>
+            </div>
+            <div class="subject">[smartam] Workflow run failed for develop</div>
+            <div class="preview">Your CI build #42 on the develop branch has failed at the "cargo check" step. View the logs to see what went wrong…</div>
+          </div>
+
+          <div class="ml-item unread">
+            <div class="row1">
+              <span class="from">佐藤 美咲</span>
+              <span class="time">11:47</span>
+            </div>
+            <div class="subject">資料レビューありがとうございました</div>
+            <div class="preview">先ほどはお時間いただきありがとうございました。フィードバックを反映した資料を添付いたします。ご確認お願いします。</div>
+            <div class="badges">
+              <span class="badge attach">📎 1</span>
+            </div>
+          </div>
+
+          <div class="ml-item read">
+            <div class="row1">
+              <span class="from">Apple Developer</span>
+              <span class="time">昨日</span>
+            </div>
+            <div class="subject">Your weekly summary · App Store Connect</div>
+            <div class="preview">Here's your weekly summary across all your apps. SmartAM had 142 downloads this week (+18%)…</div>
+          </div>
+
+          <div class="ml-item read">
+            <div class="row1">
+              <span class="from">田中 健一</span>
+              <span class="time">昨日</span>
+            </div>
+            <div class="subject">Re: 来月の出張について</div>
+            <div class="preview">承知しました。日程確定したらまた共有します。よろしくお願いします。</div>
+          </div>
+
+          <div class="ml-item read">
+            <div class="row1">
+              <span class="from">Vercel</span>
+              <span class="star">⭐</span>
+              <span class="time">2 日前</span>
+            </div>
+            <div class="subject">Deployment ready · smartam-landing.vercel.app</div>
+            <div class="preview">Your deployment from main branch (commit 8a7f3e2) is ready and live. Total build time: 42s.</div>
+          </div>
+
+          <div class="ml-item read">
+            <div class="row1">
+              <span class="from">鈴木 翔太</span>
+              <span class="time">2 日前</span>
+            </div>
+            <div class="subject">飲み会のお知らせ</div>
+            <div class="preview">来週金曜日 19:00 から、いつもの場所で開催します。参加可否を金曜日までにお知らせください。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Mail Detail ────────────────────── -->
+      <div class="pane detail" style="position: relative;">
+        <div class="detail-toolbar">
+          <button class="tb-btn" title="返信 (r)">↩</button>
+          <button class="tb-btn" title="転送 (f)">→</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn" title="アーカイブ (a)">📦</button>
+          <button class="tb-btn danger" title="削除 (#)">🗑</button>
+          <button class="tb-btn starred" title="スター (s)">⭐</button>
+          <div class="tb-divider"></div>
+          <button class="tb-btn ai-summary active" title="要約 (y)">📝</button>
+          <button class="tb-btn ai-draft" title="下書き (d)">✍</button>
+          <button class="tb-btn ai-translate" title="翻訳 (t)">🌐</button>
+          <button class="tb-btn ai-calendar" title="カレンダー (l)">📅</button>
+          <div class="tb-spacer"></div>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-40); letter-spacing: 0.08em;">
+            1 / 24
+          </span>
+        </div>
+
+        <div class="mail-body">
+          <div class="mail-head">
+            <div class="avatar">山</div>
+            <div class="info">
+              <h1>明日のミーティングについて — 日程再調整のお願い</h1>
+              <div class="from">
+                <b>山田 太郎</b>
+                <span class="addr">&lt;yamada@example.com&gt;</span>
+                — to me
+              </div>
+              <div class="meta">2026-05-22 (木) · 14:32 · 添付 2 件</div>
+            </div>
+            <div class="star">⭐</div>
+          </div>
+
+          <!-- AI Summary panel (active) -->
+          <div class="ai-panel">
+            <div class="head">
+              <span class="ico">📝</span>
+              <span class="ttl">AI 要約</span>
+              <span class="model">claude-3-5-sonnet</span>
+              <span class="regen" title="再生成">🔄</span>
+            </div>
+            <ul>
+              <li>来週の打ち合わせ日程を <strong style="background: var(--paperWh); padding: 0 4px; border-radius: 2px;">火曜または水曜の午後</strong> に再調整したい</li>
+              <li>添付資料 (議事録 v3、デザイン案) を事前確認してほしい</li>
+              <li>参加メンバーは前回と同じ 4 名で OK</li>
+              <li>場所は 5F 会議室 A を仮押さえ済み</li>
+              <li>確定したら Google Calendar に登録予定</li>
+            </ul>
+            <div class="actions">
+              <span class="a">━ コピー</span>
+              <span class="a">━ Markdown でコピー</span>
+              <span class="a">━ 閉じる</span>
+            </div>
+          </div>
+
+          <!-- Mail body -->
+          <div class="body-text">
+            <p>山田です、お疲れさまです。</p>
+            <p>先日お話した来週の打ち合わせの日程ですが、月曜日に急ぎの予定が入ってしまったため再調整させてください。</p>
+            <p><strong>火曜日もしくは水曜日午後</strong> はいかがでしょうか。場所は前回と同じ 5F 会議室 A を仮押さえしてあります。参加メンバーは佐藤さん、田中さん、鈴木さんと私で前回と同じ 4 名で問題ありません。</p>
+            <p>事前に確認いただきたいので、議事録 v3 とデザイン案の最新版を添付しました。お時間ある時にお目通しお願いします。</p>
+            <p>日程確定次第、Google Calendar に登録します。よろしくお願いいたします。</p>
+            <div class="sig">
+              ━━━━━━━━━━━━━━━━━━<br>
+              山田 太郎<br>
+              プロダクトデザイナー · エクサンプル株式会社<br>
+              yamada@example.com
+            </div>
+          </div>
+
+          <!-- Attachments -->
+          <div class="attachments">
+            <div class="attach">
+              <div class="ico">PDF</div>
+              <div>
+                <div class="name">議事録_v3.pdf</div>
+                <div class="size">428 KB</div>
+              </div>
+            </div>
+            <div class="attach">
+              <div class="ico fig">FIG</div>
+              <div>
+                <div class="name">design-proposal.fig</div>
+                <div class="size">2.1 MB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toast -->
+        <div class="toast">
+          <span style="color: var(--ai-blue);">📦</span>
+          <span>1 件アーカイブしました</span>
+          <span class="undo">取り消す</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notes ────────────────────────────────── -->
+  <div class="notes">
+    <div class="note-card">
+      <h4>━ 01 · 全体ライトモード</h4>
+      <p>ロゴ背景の <code>#F6EFE4</code> Cream を全画面に展開。紙質感のあるメールクライアントトーン。サイドバーは <code>#FAF5E7</code> でほんの少しコントラスト。</p>
+    </div>
+    <div class="note-card">
+      <h4>━ 02 · ブランド赤の使い分け</h4>
+      <p>赤 <code>#C8281E</code> は：未読バー／要対応カウント／ハイライトのみ。CTA は黒インクの埋めボタンに切替（ライトでは赤主張が強すぎる）。</p>
+    </div>
+    <div class="note-card">
+      <h4>━ 03 · AI 機能色を再調整</h4>
+      <p>暗色用パステルから、ライト向け中濃度に変更。緑 <code>#2F7A3B</code> / 黄 <code>#A06F0A</code> / 青 <code>#1D5FB3</code> / 紫 <code>#7C3EB5</code>。</p>
+    </div>
+  </div>
+</body>
+</html>

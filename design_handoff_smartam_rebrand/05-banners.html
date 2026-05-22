@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>SmartAM · Banner Studio</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --cream: #f6efe4;
+      --paper: #faf5e7;
+      --ink: #1a1410;
+      --red:  #c8281e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 56px 56px 80px;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    /* ── Page header ──────────────────────────────── */
+    header {
+      border-top: 6px solid var(--red);
+      padding-top: 24px; margin-bottom: 48px;
+    }
+    header .crumb {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.15em;
+      opacity: 0.55; margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: 48px; font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1;
+    }
+    header h1 .am { color: var(--red); }
+    header p {
+      margin-top: 14px; opacity: 0.7; max-width: 640px;
+      font-size: 16px; line-height: 1.5;
+    }
+
+    /* ── Banner card ──────────────────────────────── */
+    .b-card {
+      background: var(--paper);
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 8px;
+      padding: 0;
+      overflow: hidden;
+      margin-bottom: 36px;
+    }
+    .b-meta {
+      padding: 20px 24px 16px;
+      display: flex; align-items: baseline; gap: 14px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      flex-wrap: wrap;
+    }
+    .b-meta .id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.1em;
+      color: var(--red); font-weight: 600;
+    }
+    .b-meta .ttl {
+      font-weight: 700; font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+    .b-meta .dim {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; opacity: 0.55;
+    }
+    .b-meta .use {
+      flex: 1; min-width: 160px;
+      font-size: 12px; opacity: 0.7;
+    }
+    .b-meta .dl {
+      background: var(--ink); color: var(--cream);
+      padding: 8px 14px; border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.08em; border: none; cursor: pointer;
+      transition: background .15s;
+    }
+    .b-meta .dl:hover { background: var(--red); }
+
+    .b-stage {
+      background: repeating-linear-gradient(45deg, rgba(0,0,0,0.025) 0 6px, transparent 6px 12px);
+      padding: 24px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .b-canvas {
+      background: white;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+      transform-origin: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Common banner inner styles ─────────────── */
+    .chi {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      line-height: 0.9;
+      display: inline-block;
+    }
+    .wm {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .wm .am { color: var(--red); }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── B1 Classic Hero ─────────────────────────── */
+    .b1 {
+      width: 1280px; height: 420px;
+      background: var(--cream); padding: 56px 72px;
+      position: relative;
+      display: flex; align-items: center; gap: 48px;
+    }
+    .b1::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 10px; background: var(--red);
+    }
+    .b1 .mark .chi {
+      color: transparent; font-size: 240px;
+      -webkit-text-stroke: 8px var(--ink);
+    }
+    .b1 .mark .bar { height: 24px; width: 220px; background: var(--red); margin-top: 4px; }
+    .b1 .text .wm { font-size: 96px; }
+    .b1 .text p { font-size: 22px; opacity: 0.7; margin-top: 16px; max-width: 580px; line-height: 1.4; }
+    .b1 .text .meta {
+      margin-top: 22px; display: flex; gap: 16px;
+      font-family: 'JetBrains Mono', monospace; font-size: 14px;
+      letter-spacing: 0.1em; opacity: 0.55;
+    }
+    .b1 .corner-tag {
+      position: absolute; right: 28px; bottom: 28px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.18em; opacity: 0.45;
+    }
+
+    /* ── B2 Minimal Big ──────────────────────────── */
+    .b2 {
+      width: 1280px; height: 420px;
+      background: var(--cream); padding: 48px 56px;
+      position: relative; overflow: hidden;
+    }
+    .b2 .huge {
+      position: absolute; left: 40px; top: -80px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 900; font-size: 520px;
+      color: transparent;
+      -webkit-text-stroke: 12px var(--ink);
+      letter-spacing: -0.06em;
+    }
+    .b2 .bar {
+      position: absolute; left: 56px; bottom: 88px;
+      width: 260px; height: 32px; background: var(--red);
+    }
+    .b2 .text {
+      position: absolute; right: 64px; bottom: 56px; text-align: right;
+    }
+    .b2 .text .wm { font-size: 72px; }
+    .b2 .text .sub { font-family: 'JetBrains Mono', monospace; font-size: 14px; letter-spacing: 0.18em; opacity: 0.55; margin-top: 12px; }
+
+    /* ── B3 Brutalist Asymmetric ─────────────────── */
+    .b3 {
+      width: 1280px; height: 420px;
+      background: var(--cream); padding: 48px 56px;
+      position: relative; overflow: hidden;
+    }
+    .b3 .chi-big {
+      position: absolute; left: 56px; top: 16px;
+      font-family: 'Noto Sans JP', sans-serif; font-weight: 900;
+      font-size: 360px; line-height: 0.85; color: var(--ink);
+      letter-spacing: -0.06em;
+    }
+    .b3 .stripe {
+      position: absolute; top: 56px; right: -60px;
+      width: 800px; height: 80px;
+      background: var(--red);
+      transform: rotate(-8deg);
+    }
+    .b3 .stripe span {
+      position: absolute; right: 100px; top: 50%; transform: translateY(-50%);
+      color: var(--cream);
+      font-family: 'Inter', sans-serif; font-weight: 800;
+      font-size: 36px; letter-spacing: -0.02em;
+    }
+    .b3 .footer {
+      position: absolute; bottom: 36px; right: 56px; text-align: right;
+    }
+    .b3 .footer .wm { font-size: 64px; }
+    .b3 .footer .mono { font-size: 14px; opacity: 0.55; margin-top: 8px; }
+
+    /* ── B4 Tall Vertical Poster ─────────────────── */
+    .b4 {
+      width: 800px; height: 1200px;
+      background: var(--cream); padding: 64px 64px;
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .b4::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 14px; background: var(--red);
+    }
+    .b4 .mono-top {
+      font-family: 'JetBrains Mono', monospace; font-size: 16px;
+      letter-spacing: 0.2em; opacity: 0.55;
+    }
+    .b4 .chi-stack { margin-top: 64px; }
+    .b4 .chi-stack .chi {
+      font-size: 420px; color: transparent;
+      -webkit-text-stroke: 14px var(--ink);
+    }
+    .b4 .chi-stack .bar {
+      width: 360px; height: 36px; background: var(--red); margin-top: 6px;
+    }
+    .b4 .wm-block { margin-top: 100px; }
+    .b4 .wm-block .wm { font-size: 120px; }
+    .b4 .wm-block p { font-size: 24px; margin-top: 16px; opacity: 0.7; line-height: 1.4; max-width: 580px; }
+    .b4 .features {
+      margin-top: auto; padding-top: 48px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+      font-family: 'JetBrains Mono', monospace; font-size: 16px;
+      letter-spacing: 0.06em;
+    }
+    .b4 .features span::before { content: "━ "; color: var(--red); }
+
+    /* ── B5 Square Social ────────────────────────── */
+    .b5 {
+      width: 1200px; height: 1200px;
+      background: var(--cream); padding: 96px;
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .b5::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 16px; background: var(--red);
+    }
+    .b5 .top-row {
+      display: flex; justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace; font-size: 18px;
+      letter-spacing: 0.2em; opacity: 0.55;
+    }
+    .b5 .center {
+      text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    .b5 .center .chi {
+      font-size: 580px;
+      color: transparent;
+      -webkit-text-stroke: 18px var(--ink);
+    }
+    .b5 .center .bar { width: 420px; height: 42px; background: var(--red); }
+    .b5 .center .wm { font-size: 140px; margin-top: 36px; }
+    .b5 .bottom {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px; letter-spacing: 0.15em;
+      text-align: center; opacity: 0.7;
+    }
+
+    /* ── B6 Wide Cinematic ──────────────────────── */
+    .b6 {
+      width: 1920px; height: 600px;
+      background: var(--cream); padding: 80px 120px;
+      position: relative; overflow: hidden;
+      display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 48px; align-items: center;
+    }
+    .b6::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 12px; background: var(--red);
+    }
+    .b6 .mark .chi {
+      font-size: 380px; color: transparent;
+      -webkit-text-stroke: 12px var(--ink);
+    }
+    .b6 .mark .bar { width: 340px; height: 36px; background: var(--red); margin-top: 8px; }
+    .b6 .text .wm { font-size: 132px; }
+    .b6 .text p { margin-top: 20px; font-size: 26px; opacity: 0.7; line-height: 1.4; }
+    .b6 .ss {
+      background: #1e1e2e; border-radius: 16px; height: 380px;
+      position: relative; overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+    }
+    .b6 .ss::before {
+      content: "App screenshot"; position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #6c7086; font-family: 'JetBrains Mono', monospace; font-size: 16px;
+      letter-spacing: 0.1em;
+    }
+    .b6 .ss::after {
+      content: ""; position: absolute; top: 12px; left: 12px;
+      width: 36px; height: 8px; border-radius: 4px;
+      background: linear-gradient(90deg, #f38ba8 0 12px, transparent 12px 14px, #f9e2af 14px 26px, transparent 26px 28px, #a6e3a1 28px 40px);
+    }
+
+    /* ── B7 Dark Mode ────────────────────────────── */
+    .b7 {
+      width: 1280px; height: 420px;
+      background: #181825; color: var(--cream);
+      padding: 56px 72px;
+      position: relative;
+      display: flex; align-items: center; gap: 48px;
+    }
+    .b7::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 10px; background: var(--red);
+    }
+    .b7 .mark .chi {
+      color: transparent; font-size: 240px;
+      -webkit-text-stroke: 8px var(--cream);
+    }
+    .b7 .mark .bar { height: 24px; width: 220px; background: var(--red); margin-top: 4px; }
+    .b7 .text .wm { font-size: 96px; color: var(--cream); }
+    .b7 .text .wm .am { color: var(--red); }
+    .b7 .text p { font-size: 22px; opacity: 0.7; margin-top: 16px; max-width: 580px; line-height: 1.4; }
+    .b7 .text .meta {
+      margin-top: 22px; display: flex; gap: 16px;
+      font-family: 'JetBrains Mono', monospace; font-size: 14px;
+      letter-spacing: 0.1em; opacity: 0.5;
+    }
+    .b7 .corner-tag {
+      position: absolute; right: 28px; bottom: 28px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.18em; opacity: 0.4;
+    }
+
+    /* ── B8 Twitter / X Header (1500x500) ──────── */
+    .b8 {
+      width: 1500px; height: 500px;
+      background: var(--cream); padding: 56px 80px;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; gap: 56px;
+    }
+    .b8::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0;
+      height: 10px; background: var(--red);
+    }
+    /* Twitter overlays an avatar at left bottom; leave room */
+    .b8 .reserved {
+      position: absolute; left: 60px; bottom: -8px;
+      width: 280px; height: 280px; border-radius: 50%;
+      border: 6px dashed rgba(0,0,0,0.12);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      color: rgba(0,0,0,0.4); letter-spacing: 0.15em;
+    }
+    .b8 .body {
+      margin-left: 360px;
+      display: flex; align-items: center; gap: 48px;
+    }
+    .b8 .mark .chi {
+      font-size: 220px; color: transparent;
+      -webkit-text-stroke: 8px var(--ink);
+    }
+    .b8 .mark .bar { height: 22px; width: 200px; background: var(--red); margin-top: 4px; }
+    .b8 .text .wm { font-size: 92px; }
+    .b8 .text p {
+      margin-top: 14px; font-size: 20px; opacity: 0.7;
+      max-width: 480px; line-height: 1.4;
+    }
+
+    /* ── B9 Email Signature ──────────────────────── */
+    .b9 {
+      width: 600px; height: 120px;
+      background: var(--cream); padding: 20px 28px;
+      display: flex; align-items: center; gap: 24px;
+      border-left: 6px solid var(--red);
+    }
+    .b9 .mark .chi {
+      font-size: 64px; color: transparent;
+      -webkit-text-stroke: 2.5px var(--ink);
+    }
+    .b9 .mark .bar { height: 7px; width: 60px; background: var(--red); margin-top: 2px; }
+    .b9 .text .wm { font-size: 32px; }
+    .b9 .text p { font-size: 13px; opacity: 0.65; margin-top: 4px; }
+    .b9 .corner { margin-left: auto; text-align: right; }
+    .b9 .corner .mono { font-size: 11px; opacity: 0.55; }
+    .b9 .corner .mono.url { font-size: 12px; opacity: 0.8; margin-top: 2px; color: var(--ink); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="crumb">SMARTAM · BANNER STUDIO · 8 LAYOUTS</div>
+      <h1>Banner<span class="am">s.</span></h1>
+      <p>用途別 8 種類のバナーレイアウト。GitHub README、X/Twitter ヘッダー、ソーシャル正方形、縦長ポスター、メール署名まで。各カードのダウンロードボタンで原寸 PNG が書き出せます。</p>
+    </header>
+
+    <!-- ── B1 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B1</span>
+        <span class="ttl">Classic Hero</span>
+        <span class="dim">1280 × 420</span>
+        <span class="use">GitHub README / docs 最上部。最初に置く標準形。</span>
+        <button class="dl" data-banner="b1" data-w="1280" data-h="420">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b1" style="transform: scale(0.7);">
+          <div class="b1">
+            <div class="mark">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+            </div>
+            <div class="text">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <p>AI をネイティブに統合した macOS デスクトップメーラー。要約、返信下書き、翻訳、カレンダー登録を、ワンキーで。</p>
+              <div class="meta">
+                <span>━ TAURI v2</span><span>━ SVELTEKIT</span><span>━ MIT</span>
+              </div>
+            </div>
+            <div class="corner-tag">v0.1.0 · 智 · CHI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B2 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B2</span>
+        <span class="ttl">Minimal · Big Crop</span>
+        <span class="dim">1280 × 420</span>
+        <span class="use">智 をクロップして主役に。文字情報少なめのモダンヘッダー。</span>
+        <button class="dl" data-banner="b2" data-w="1280" data-h="420">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b2" style="transform: scale(0.7);">
+          <div class="b2">
+            <div class="huge">智</div>
+            <div class="bar"></div>
+            <div class="text">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <div class="sub">AI · NATIVE · MAIL</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B3 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B3</span>
+        <span class="ttl">Brutalist · Diagonal</span>
+        <span class="dim">1280 × 420</span>
+        <span class="use">対角線の赤帯で動きを出す。リリースアナウンス向け。</span>
+        <button class="dl" data-banner="b3" data-w="1280" data-h="420">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b3" style="transform: scale(0.7);">
+          <div class="b3">
+            <div class="chi-big">智</div>
+            <div class="stripe">
+              <span>AI · NATIVE · MAIL</span>
+            </div>
+            <div class="footer">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <div class="mono">━ v0.1.0 · OPEN SOURCE</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B4 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B4</span>
+        <span class="ttl">Tall Poster</span>
+        <span class="dim">800 × 1200</span>
+        <span class="use">Product Hunt / Pinterest / 印刷ポスター。縦長 2:3。</span>
+        <button class="dl" data-banner="b4" data-w="800" data-h="1200">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b4" style="transform: scale(0.55);">
+          <div class="b4">
+            <div class="mono-top">━ SMARTAM · POSTER · 智</div>
+            <div class="chi-stack">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+            </div>
+            <div class="wm-block">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <p>AI をネイティブに統合した macOS デスクトップメーラー。</p>
+            </div>
+            <div class="features">
+              <span>要約</span><span>下書き</span>
+              <span>翻訳</span><span>カレンダー</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B5 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B5</span>
+        <span class="ttl">Square Social</span>
+        <span class="dim">1200 × 1200</span>
+        <span class="use">Instagram / OG image / Twitter card 1:1。シンメトリ強め。</span>
+        <button class="dl" data-banner="b5" data-w="1200" data-h="1200">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b5" style="transform: scale(0.5);">
+          <div class="b5">
+            <div class="top-row">
+              <span>━ 智</span><span>CHI · SMARTAM</span>
+            </div>
+            <div class="center">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+              <div class="wm">Smart<span class="am">AM</span></div>
+            </div>
+            <div class="bottom">
+              AI · NATIVE · MAIL · CLIENT
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B6 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B6</span>
+        <span class="ttl">Wide Cinematic</span>
+        <span class="dim">1920 × 600</span>
+        <span class="use">ランディングページのヒーロー。スクショ枠付き。</span>
+        <button class="dl" data-banner="b6" data-w="1920" data-h="600">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b6" style="transform: scale(0.55);">
+          <div class="b6">
+            <div class="mark">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+            </div>
+            <div class="text">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <p>AI をネイティブに統合した、macOS のメールクライアント。</p>
+            </div>
+            <div class="ss"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B7 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B7</span>
+        <span class="ttl">Dark Mode</span>
+        <span class="dim">1280 × 420</span>
+        <span class="use">ダークテーマ docs / ターミナル系メディア向け反転版。</span>
+        <button class="dl" data-banner="b7" data-w="1280" data-h="420">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b7" style="transform: scale(0.7);">
+          <div class="b7">
+            <div class="mark">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+            </div>
+            <div class="text">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <p>AI をネイティブに統合した macOS デスクトップメーラー。要約、返信下書き、翻訳、カレンダー登録を、ワンキーで。</p>
+              <div class="meta">
+                <span>━ TAURI v2</span><span>━ SVELTEKIT</span><span>━ MIT</span>
+              </div>
+            </div>
+            <div class="corner-tag">v0.1.0 · 智 · CHI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B8 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B8</span>
+        <span class="ttl">X / Twitter Header</span>
+        <span class="dim">1500 × 500</span>
+        <span class="use">X プロフィール用。アバター被り回避レイアウト。</span>
+        <button class="dl" data-banner="b8" data-w="1500" data-h="500">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b8" style="transform: scale(0.6);">
+          <div class="b8">
+            <div class="reserved">avatar area</div>
+            <div class="body">
+              <div class="mark">
+                <div class="chi">智</div>
+                <div class="bar"></div>
+              </div>
+              <div class="text">
+                <div class="wm">Smart<span class="am">AM</span></div>
+                <p>AI ネイティブメーラー · macOS · Open Source</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B9 ── -->
+    <div class="b-card">
+      <div class="b-meta">
+        <span class="id">B9</span>
+        <span class="ttl">Email Signature</span>
+        <span class="dim">600 × 120</span>
+        <span class="use">メール署名／ニュースレターフッター用の細長バナー。</span>
+        <button class="dl" data-banner="b9" data-w="600" data-h="120">DOWNLOAD PNG ↓</button>
+      </div>
+      <div class="b-stage">
+        <div class="b-canvas" data-banner-target="b9" style="transform: scale(1);">
+          <div class="b9">
+            <div class="mark">
+              <div class="chi">智</div>
+              <div class="bar"></div>
+            </div>
+            <div class="text">
+              <div class="wm">Smart<span class="am">AM</span></div>
+              <p>AI ネイティブメーラー</p>
+            </div>
+            <div class="corner">
+              <div class="mono">━ v0.1.0</div>
+              <div class="mono url">smartam.dev</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── PNG export via html-to-image (loaded lazily) ─────────────
+    // We render the live DOM banner to a canvas using html2canvas-style
+    // approach. Since we can't pull external libs reliably, we use a
+    // foreignObject SVG → image approach.
+    async function exportBannerToPng(id, w, h, filename) {
+      const node = document.querySelector(`[data-banner-target="${id}"] > *`);
+      if (!node) return;
+      // Wait for fonts
+      await document.fonts.ready;
+      // Clone node and serialize as inline SVG with foreignObject
+      const clone = node.cloneNode(true);
+      // Inline computed font sizes are kept by CSS rules already included
+      // in this page.  We need to embed those rules in the SVG <style>.
+      const styles = Array.from(document.styleSheets).map(ss => {
+        try { return Array.from(ss.cssRules).map(r => r.cssText).join('\n'); }
+        catch { return ''; }
+      }).join('\n');
+      const xhtml = new XMLSerializer().serializeToString(clone);
+      const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px">
+      <style>${styles}</style>
+      ${xhtml}
+    </div>
+  </foreignObject>
+</svg>`.trim();
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      // White background (some banners are white anyway)
+      ctx.fillStyle = '#f6efe4';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => {
+        const a = document.createElement('a');
+        a.download = filename;
+        a.href = URL.createObjectURL(b);
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }, 'image/png');
+    }
+
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.dl[data-banner]');
+      if (!btn) return;
+      const id = btn.dataset.banner;
+      const w = parseInt(btn.dataset.w, 10);
+      const h = parseInt(btn.dataset.h, 10);
+      btn.textContent = 'RENDERING…';
+      try {
+        await exportBannerToPng(id, w, h, `smartam-${id}-${w}x${h}.png`);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        btn.textContent = 'DOWNLOAD PNG ↓';
+      }
+    });
+  </script>
+</body>
+</html>

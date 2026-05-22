@@ -61,6 +61,7 @@ export interface AppSettings {
   dateFormat: string;
   timezone: string;
   logLevel: LogLevel;
+  theme: 'dark' | 'light';
 }
 
 export const DEFAULT_ACCOUNT_EXTRAS = {
@@ -88,6 +89,7 @@ export const DEFAULTS: AppSettings = {
   dateFormat: 'YYYY/MM/DD HH:mm:ss',
   timezone: 'Asia/Tokyo',
   logLevel: 'info' as LogLevel,
+  theme: 'light' as const,
 };
 
 let _store: Awaited<ReturnType<typeof load>> | null = null;

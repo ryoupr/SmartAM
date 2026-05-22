@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+
   let { mode = 'new', to = '', subject = '', body = '', signature = '', onClose, onSend, attachmentPaths = $bindable([]) }: {
     mode?: 'new' | 'reply' | 'forward';
     to?: string;
@@ -58,13 +60,13 @@
       <div class="signature">{signature}</div>
     {/if}
     <div class="compose-actions">
-      <button class="btn-attach" onclick={addAttachment}>📎 添付</button>
+      <button class="btn-attach" onclick={addAttachment}><Icon name="attach" size={14} /> 添付</button>
       {#each attachmentPaths as path, i}
         <span class="att-tag">📄 {path.split('/').pop()} <button class="att-rm" onclick={() => removeAttachment(i)}>✕</button></span>
       {/each}
       <div class="spacer"></div>
       <button class="btn-cancel" onclick={onClose}>キャンセル</button>
-      <button class="btn-send" disabled={sending} onclick={handleSend}>📤 送信</button>
+      <button class="btn-send" disabled={sending} onclick={handleSend}><Icon name="send" size={14} /> 送信</button>
     </div>
   </div>
 </div>
