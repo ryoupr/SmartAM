@@ -75,7 +75,7 @@ pub fn set_cache_max(max: usize) {
     CACHE_MAX.store(max, Ordering::Relaxed);
     let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.evict(max);
-    crate::trace::trace("IMAP", &format!("cache max set to {}, bytes: {}KB", max, cache.estimated_bytes / 1024));
+    log::debug!("cache max set to {}, bytes: {}KB", max, cache.estimated_bytes / 1024);
 }
 
 static FOLDER_MAP: LazyLock<Mutex<HashMap<String, HashMap<String, String>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -111,7 +111,7 @@ fn discover_folders(session: &mut ImapSession, email: &str) -> Result<(), String
         if has_attr("\\Trash") { account_map.insert("TRASH".to_string(), name.clone()); }
     }
 
-    crate::trace::trace("IMAP", &format!("discover_folders[{}]: {:?}", email, account_map));
+    log::debug!("discover_folders[{}]: {:?}", email, account_map);
     Ok(())
 }
 
@@ -128,7 +128,7 @@ fn decode_rfc2047(raw: &[u8]) -> String {
 }
 
 fn connect_sync(config: &AccountConfig) -> Result<ImapSession, String> {
-    crate::trace::trace("IMAP", &format!("connect: {}:{}", config.imap_host, config.imap_port));
+    log::debug!("connect: {}:{}", config.imap_host, config.imap_port);
     let tls = native_tls::TlsConnector::new().map_err(|e| format!("TLS作成失敗: {e}"))?;
     let client = imap::connect(
         (config.imap_host.as_str(), config.imap_port),
@@ -137,17 +137,17 @@ fn connect_sync(config: &AccountConfig) -> Result<ImapSession, String> {
     ).map_err(|e| format!("接続失敗: {e}"))?;
 
     if config.auth_type == "oauth" {
-        crate::trace::trace("IMAP", "connect: XOAUTH2...");
+        log::debug!("connect: XOAUTH2...");
         let auth_str = format!("user={}\x01auth=Bearer {}\x01\x01", config.email, config.access_token);
         let session = client.authenticate("XOAUTH2", &XOAuth2(auth_str))
             .map_err(|e| format!("OAuth認証失敗: {}", e.0))?;
-        crate::trace::trace("IMAP", "connect: XOAUTH2 OK");
+        log::debug!("connect: XOAUTH2 OK");
         Ok(session)
     } else {
-        crate::trace::trace("IMAP", "connect: password login...");
+        log::debug!("connect: password login...");
         let session = client.login(&config.email, &config.password)
             .map_err(|e| format!("ログイン失敗: {}", e.0))?;
-        crate::trace::trace("IMAP", "connect: login OK");
+        log::debug!("connect: login OK");
         Ok(session)
     }
 }
@@ -163,15 +163,15 @@ where
     let mut session = match existing {
         Some(mut s) => {
             if s.noop().is_ok() {
-                crate::trace::trace("IMAP", "pool: reusing session");
+                log::debug!("pool: reusing session");
                 s
             } else {
-                crate::trace::trace("IMAP", "pool: stale, reconnecting");
+                log::debug!("pool: stale, reconnecting");
                 connect_sync(config)?
             }
         }
         None => {
-            crate::trace::trace("IMAP", "pool: new connection");
+            log::debug!("pool: new connection");
             let mut s = connect_sync(config)?;
             if !FOLDER_MAP.lock().unwrap_or_else(|e| e.into_inner()).contains_key(&config.email) {
                 let _ = discover_folders(&mut s, &config.email);
@@ -257,16 +257,16 @@ pub async fn fetch_list(config: &AccountConfig, folder: &str, count: u32) -> Res
                 let uids: Vec<u32> = session.uid_search("FLAGGED")
                     .map_err(|e| format!("検索失敗: {e}"))?
                     .into_iter().collect();
-                crate::trace::trace("IMAP", &format!("fetch_list STARRED: {} flagged", uids.len()));
+                log::debug!("fetch_list STARRED: {} flagged", uids.len());
                 let take: Vec<u32> = uids.into_iter().rev().take(count as usize).collect();
                 let mut results = fetch_envelope_list(session, &take)?;
                 results.sort_by(|a, b| b.uid.cmp(&a.uid));
-                crate::trace::trace("IMAP", &format!("fetch_list STARRED: done, {} results", results.len()));
+                log::debug!("fetch_list STARRED: done, {} results", results.len());
                 Ok(results)
             } else {
                 let mailbox = session.select(&resolve_folder(&config.email, &folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
                 let total = mailbox.exists;
-                crate::trace::trace("IMAP", &format!("fetch_list {}: {total} messages", folder));
+                log::debug!("fetch_list {}: {total} messages", folder);
                 if total == 0 { return Ok(vec![]); }
                 let start = total.saturating_sub(count) + 1;
                 let range = format!("{start}:{total}");
@@ -285,7 +285,7 @@ pub async fn fetch_list(config: &AccountConfig, folder: &str, count: u32) -> Res
                     results.push(MailSummary { uid, from, subject, date, seen });
                 }
                 results.reverse();
-                crate::trace::trace("IMAP", &format!("fetch_list: done, {} results", results.len()));
+                log::debug!("fetch_list: done, {} results", results.len());
                 Ok(results)
             }
         })
@@ -321,7 +321,7 @@ pub async fn fetch_mail_page(config: &AccountConfig, folder: &str, offset: u32, 
             let start = end.saturating_sub(limit) + 1;
             let range = format!("{start}:{end}");
 
-            crate::trace::trace("IMAP", &format!("fetch_mail_page: seq {range} (offset={offset}, limit={limit}, total={total})"));
+            log::debug!("fetch_mail_page: seq {range} (offset={offset}, limit={limit}, total={total})");
             let messages = session.fetch(&range, "(UID FLAGS ENVELOPE)")
                 .map_err(|e| format!("メール取得失敗: {e}"))?;
 
@@ -336,7 +336,7 @@ pub async fn fetch_mail_page(config: &AccountConfig, folder: &str, offset: u32, 
                 results.push(MailSummary { uid, from, subject, date, seen });
             }
             results.reverse();
-            crate::trace::trace("IMAP", &format!("fetch_mail_page: got {} results", results.len()));
+            log::debug!("fetch_mail_page: got {} results", results.len());
             Ok((results, total))
             }
         })
@@ -362,7 +362,7 @@ pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, lim
                 .map_err(|e| format!("検索失敗: {e}"))?
                 .into_iter().collect();
 
-            crate::trace::trace("IMAP", &format!("search_mails: {} hits for '{}'", uids.len(), query));
+            log::debug!("search_mails: {} hits for '{}'", uids.len(), query);
             let take: Vec<u32> = uids.into_iter().rev().take(limit as usize).collect();
             let mut results = fetch_envelope_list(session, &take)?;
             results.sort_by(|a, b| b.uid.cmp(&a.uid));
@@ -395,7 +395,7 @@ pub async fn fetch_new_mails(config: &AccountConfig, folder: &str, since_uid: u3
                 results.push(MailSummary { uid, from, subject, date, seen });
             }
             results.reverse();
-            crate::trace::trace("IMAP", &format!("fetch_new_mails: {} new since uid={}", results.len(), since_uid));
+            log::debug!("fetch_new_mails: {} new since uid={}", results.len(), since_uid);
             Ok(results)
         })
     }).await.map_err(|e| format!("{e}"))?
@@ -445,7 +445,7 @@ fn parse_mail_detail(uid: u32, msg: &imap::types::Fetch) -> Result<MailDetail, S
 pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Result<MailDetail, String> {
     // Check cache first
     if let Some(detail) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&uid) {
-        crate::trace::trace("IMAP", &format!("fetch_detail uid={}: cache HIT", uid));
+        log::debug!("fetch_detail uid={}: cache HIT", uid);
         return Ok(detail.clone());
     }
 
@@ -459,7 +459,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
             let msg = messages.iter().next().ok_or("メールが見つかりません".to_string())?;
             let detail = parse_mail_detail(uid, &msg)?;
             CACHE.lock().unwrap_or_else(|e| e.into_inner()).insert(uid, detail.clone());
-            crate::trace::trace("IMAP", &format!("fetch_detail uid={}: fetched & cached", uid));
+            log::debug!("fetch_detail uid={}: fetched & cached", uid);
             Ok(detail)
         })
     }).await.map_err(|e| format!("{e}"))?
@@ -472,7 +472,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
         uids.into_iter().filter(|uid| !cache.contains_key(uid)).collect()
     };
     if uncached.is_empty() {
-        crate::trace::trace("IMAP", "preload: all cached");
+        log::debug!("preload: all cached");
         return Ok(0);
     }
 
@@ -482,7 +482,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
         with_session(&config, |session| {
             session.select(resolve_folder(&config.email, &folder)).map_err(|e| format!("フォルダ選択失敗: {e}"))?;
             let uid_range: String = uncached.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
-            crate::trace::trace("IMAP", &format!("preload: fetching {} mails", uncached.len()));
+            log::debug!("preload: fetching {} mails", uncached.len());
 
             let messages = session.uid_fetch(&uid_range, "(UID ENVELOPE BODY[])")
                 .map_err(|e| format!("プリロード失敗: {e}"))?;
@@ -535,7 +535,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                 }
             }
 
-            crate::trace::trace("IMAP", &format!("preload: cached {} mails", count));
+            log::debug!("preload: cached {} mails", count);
             Ok(count)
         })
     }).await.map_err(|e| format!("{e}"))?
@@ -644,7 +644,7 @@ pub async fn fetch_attachment_data(config: &AccountConfig, folder: &str, uid: u3
     // Check ICS cache first
     let cache_key = format!("{}:{}", uid, part_index);
     if let Some(b64) = ICS_CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&cache_key) {
-        crate::trace::trace("IMAP", &format!("fetch_attachment uid={}:{}: ICS cache HIT", uid, part_index));
+        log::debug!("fetch_attachment uid={}:{}: ICS cache HIT", uid, part_index);
         return Ok(b64.clone());
     }
     let data = fetch_attachment_bytes(config, folder, uid, part_index).await?;

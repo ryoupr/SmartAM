@@ -83,7 +83,7 @@ impl AiUsageStore {
 
 pub fn set_budget_limit(usd: f64) {
     BUDGET_LIMIT.store((usd * 100.0) as u64, std::sync::atomic::Ordering::Relaxed);
-    crate::trace::trace("AI_USAGE", &format!("budget limit set to ${:.2}", usd));
+    log::info!("AI budget limit set to ${:.2}", usd);
 }
 
 pub fn check_budget() -> Result<(), String> {
@@ -121,12 +121,7 @@ pub fn record_usage(model: &str, input_tokens: u64, output_tokens: u64) {
 
     store.save();
 
-    crate::trace::trace("AI_USAGE", &format!(
-        "model={} in={} out={} cost=${:.6} total=${:.4}",
-        model, input_tokens, output_tokens,
-        cost_usd,
-        total_mc as f64 / 1_000_000.0
-    ));
+    log::trace!("AI usage: model={} in={} out={} cost=${:.6} total=${:.4}", model, input_tokens, output_tokens, cost_usd, total_mc as f64 / 1_000_000.0);
 }
 
 pub fn get_summary() -> UsageSummary {
@@ -213,7 +208,7 @@ fn get_pricing(model: &str) -> ModelPricing {
 }
 
 pub async fn fetch_pricing() {
-    crate::trace::trace("AI_USAGE", "Fetching Bedrock pricing...");
+    log::debug!("Fetching Bedrock pricing...");
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
@@ -223,13 +218,13 @@ pub async fn fetch_pricing() {
 
     let resp = match resp {
         Ok(r) if r.status().is_success() => r,
-        _ => { crate::trace::trace("AI_USAGE", "Failed to fetch pricing"); return; }
+        _ => { log::warn!("Failed to fetch Bedrock pricing"); return; }
     };
 
     // Check content length to prevent memory spike
     if let Some(len) = resp.content_length() {
         if len > 10_000_000 {
-            crate::trace::trace("AI_USAGE", &format!("Pricing response too large: {} bytes", len));
+            log::warn!("Pricing response too large: {} bytes", len);
             return;
         }
     }
@@ -265,16 +260,16 @@ pub async fn fetch_pricing() {
     // If content_length was None, fetch bytes and check size
     let bytes = match resp.bytes().await {
         Ok(b) => b,
-        Err(e) => { crate::trace::trace("AI_USAGE", &format!("Failed to read pricing body: {e}")); return; }
+        Err(e) => { log::warn!("Failed to read pricing body: {e}"); return; }
     };
     if bytes.len() > 10_000_000 {
-        crate::trace::trace("AI_USAGE", &format!("Pricing response too large: {} bytes", bytes.len()));
+        log::warn!("Pricing response too large: {} bytes", bytes.len());
         return;
     }
 
     let data: PriceIndex = match serde_json::from_slice(&bytes) {
         Ok(d) => d,
-        Err(e) => { crate::trace::trace("AI_USAGE", &format!("Parse pricing failed: {e}")); return; }
+        Err(e) => { log::warn!("Parse pricing failed: {e}"); return; }
     };
 
     let mut pricing_map: HashMap<String, (Option<f64>, Option<f64>)> = HashMap::new();
@@ -313,5 +308,5 @@ pub async fn fetch_pricing() {
             cache.insert(model, ModelPricing { input_per_1k: i, output_per_1k: o });
         }
     }
-    crate::trace::trace("AI_USAGE", &format!("Pricing loaded: {} models", cache.len()));
+    log::info!("Bedrock pricing loaded: {} models", cache.len());
 }

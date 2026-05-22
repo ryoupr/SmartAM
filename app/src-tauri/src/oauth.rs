@@ -1,4 +1,3 @@
-use crate::trace;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -31,14 +30,14 @@ struct TokenResponse {
 }
 
 pub async fn start_flow() -> Result<OAuthTokens, String> {
-    trace::trace("OAUTH", "Starting OAuth flow");
+    log::debug!("Starting OAuth flow");
 
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| format!("ローカルサーバー起動失敗: {e}"))?;
     let port = listener.local_addr().map_err(|e| format!("{e}"))?.port();
     let redirect_uri = format!("http://127.0.0.1:{port}");
-    trace::trace("OAUTH", &format!("Listening on port {port}"));
+    log::debug!("OAuth listening on port {port}");
 
     let cid = client_id();
     let state = format!("{:x}{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(), std::process::id());
@@ -57,7 +56,7 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
         .arg(url.as_str())
         .spawn()
         .map_err(|e| format!("ブラウザ起動失敗: {e}"))?;
-    trace::trace("OAUTH", "Browser opened");
+    log::debug!("Browser opened");
 
     let (mut stream, _) = listener
         .accept()
@@ -67,7 +66,7 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
     let mut buf = vec![0u8; 4096];
     let n = stream.read(&mut buf).await.map_err(|e| format!("{e}"))?;
     let request = String::from_utf8_lossy(&buf[..n]);
-    trace::trace("OAUTH", "Received callback");
+    log::debug!("Received callback");
 
     let code = request
         .lines()
@@ -95,7 +94,7 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
     );
     stream.write_all(response.as_bytes()).await.ok();
 
-    trace::trace("OAUTH", "Exchanging code for tokens");
+    log::debug!("Exchanging code for tokens");
     exchange_code(code, &redirect_uri).await
 }
 
@@ -128,7 +127,7 @@ async fn exchange_code(code: &str, redirect_uri: &str) -> Result<OAuthTokens, St
 
     let expires_at = chrono::Utc::now().timestamp() + data.expires_in;
     let email = fetch_email(&data.access_token).await?;
-    trace::trace("OAUTH", &format!("Token exchange successful, email: {email}"));
+    log::debug!("OAuth token exchange successful, email: {email}");
 
     Ok(OAuthTokens {
         access_token: data.access_token,
@@ -158,7 +157,7 @@ async fn fetch_email(access_token: &str) -> Result<String, String> {
 }
 
 pub async fn refresh(refresh_token: &str) -> Result<OAuthTokens, String> {
-    trace::trace("OAUTH", "Refreshing access token");
+    log::debug!("Refreshing access token");
     let cid = client_id();
     let csec = client_secret();
     let client = reqwest::Client::new();
@@ -186,7 +185,7 @@ pub async fn refresh(refresh_token: &str) -> Result<OAuthTokens, String> {
 
     let expires_at = chrono::Utc::now().timestamp() + data.expires_in;
     let email = fetch_email(&data.access_token).await.unwrap_or_default();
-    trace::trace("OAUTH", "Token refresh successful");
+    log::debug!("Token refresh successful");
 
     Ok(OAuthTokens {
         access_token: data.access_token,

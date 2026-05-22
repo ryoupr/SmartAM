@@ -183,3 +183,99 @@ export function formatMailDate(raw: string, format: string, tz: string): string 
       .replace('HH', H).replace('mm', m).replace('ss', s);
   } catch { return raw; }
 }
+
+// --- Keychain Integration ---
+
+export async function saveCredentialToKeychain(account: string, keyType: string, secret: string): Promise<void> {
+  if (!secret) return;
+  await invoke('store_keychain', { account, keyType, secret });
+}
+
+export async function getCredentialFromKeychain(account: string, keyType: string): Promise<string> {
+  try {
+    return await invoke<string>('get_keychain', { account, keyType });
+  } catch {
+    return '';
+  }
+}
+
+export async function deleteCredentialFromKeychain(account: string, keyType: string): Promise<void> {
+  await invoke('delete_keychain', { account, keyType }).catch(() => {});
+}
+
+/**
+ * Migrate credentials from settings.json to Keychain.
+ * Call once on app startup. After migration, credentials are cleared from settings.
+ */
+export async function migrateCredentialsToKeychain(settings: AppSettings): Promise<boolean> {
+  let migrated = false;
+  for (const acc of settings.accounts) {
+    if (acc.password) {
+      await saveCredentialToKeychain(acc.email, 'imap-password', acc.password);
+      acc.password = '';
+      migrated = true;
+    }
+    if (acc.access_token) {
+      await saveCredentialToKeychain(acc.email, 'oauth-access-token', acc.access_token);
+      acc.access_token = '';
+      migrated = true;
+    }
+    if (acc.refresh_token) {
+      await saveCredentialToKeychain(acc.email, 'oauth-refresh-token', acc.refresh_token);
+      acc.refresh_token = '';
+      migrated = true;
+    }
+  }
+  // LLM API keys
+  const llm = settings.llm;
+  if (llm.openai.api_key) {
+    await saveCredentialToKeychain('openai', 'llm-api-key', llm.openai.api_key);
+    llm.openai.api_key = '';
+    migrated = true;
+  }
+  if (llm.anthropic.api_key) {
+    await saveCredentialToKeychain('anthropic', 'llm-api-key', llm.anthropic.api_key);
+    llm.anthropic.api_key = '';
+    migrated = true;
+  }
+  if (llm.gemini.api_key) {
+    await saveCredentialToKeychain('gemini', 'llm-api-key', llm.gemini.api_key);
+    llm.gemini.api_key = '';
+    migrated = true;
+  }
+  if (llm.bedrock.api_key) {
+    await saveCredentialToKeychain('bedrock', 'llm-api-key', llm.bedrock.api_key);
+    llm.bedrock.api_key = '';
+    migrated = true;
+  }
+  if (llm.bedrock.access_key) {
+    await saveCredentialToKeychain('bedrock', 'aws-access-key', llm.bedrock.access_key);
+    llm.bedrock.access_key = '';
+    migrated = true;
+  }
+  if (llm.bedrock.secret_key) {
+    await saveCredentialToKeychain('bedrock', 'aws-secret-key', llm.bedrock.secret_key);
+    llm.bedrock.secret_key = '';
+    migrated = true;
+  }
+  return migrated;
+}
+
+/**
+ * Load credentials from Keychain back into settings object (for runtime use).
+ * Call after loadSettings() to hydrate credentials.
+ */
+export async function hydrateCredentialsFromKeychain(settings: AppSettings): Promise<void> {
+  for (const acc of settings.accounts) {
+    if (!acc.password) acc.password = await getCredentialFromKeychain(acc.email, 'imap-password');
+    if (!acc.access_token) acc.access_token = await getCredentialFromKeychain(acc.email, 'oauth-access-token');
+    if (!acc.refresh_token) acc.refresh_token = await getCredentialFromKeychain(acc.email, 'oauth-refresh-token');
+  }
+  const llm = settings.llm;
+  if (!llm.openai.api_key) llm.openai.api_key = await getCredentialFromKeychain('openai', 'llm-api-key');
+  if (!llm.anthropic.api_key) llm.anthropic.api_key = await getCredentialFromKeychain('anthropic', 'llm-api-key');
+  if (!llm.gemini.api_key) llm.gemini.api_key = await getCredentialFromKeychain('gemini', 'llm-api-key');
+  if (!llm.bedrock.api_key) llm.bedrock.api_key = await getCredentialFromKeychain('bedrock', 'llm-api-key');
+  if (!llm.bedrock.access_key) llm.bedrock.access_key = await getCredentialFromKeychain('bedrock', 'aws-access-key');
+  if (!llm.bedrock.secret_key) llm.bedrock.secret_key = await getCredentialFromKeychain('bedrock', 'aws-secret-key');
+}

@@ -6,19 +6,20 @@
   import MailDetail from '$lib/components/MailDetail.svelte';
   import Settings from '$lib/components/Settings.svelte';
   import ComposeModal from '$lib/components/ComposeModal.svelte';
+  import ShortcutManager from '$lib/components/ShortcutManager.svelte';
+  import ToastNotification from '$lib/components/ToastNotification.svelte';
+  import UpdateBanner from '$lib/components/UpdateBanner.svelte';
+  import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
   import type { MailSummary, MailDetail as MailDetailType } from '$lib/types';
-  import { loadSettings, saveSettings, getImapConfig, getSmtpConfig, getLlmConfig, type AppSettings, type ShortcutMap, DEFAULTS } from '$lib/store';
-  import { check } from '@tauri-apps/plugin-updater';
-  import { relaunch } from '@tauri-apps/plugin-process';
+  import { loadSettings, saveSettings, getImapConfig, getSmtpConfig, getLlmConfig, type AppSettings, DEFAULTS } from '$lib/store';
+  import { refreshOAuthToken, fetchMailPage, fetchNewMailsSince, prefetchAllFolders, sendNotificationForNewMails, type FolderCache } from '$lib/mailSync';
+  import { archiveMail, deleteMail, toggleStar, downloadAttachment, sendMail } from '$lib/mailActions';
 
-  function trace(tag: string, msg: string) {
-    console.log(`[${tag}] ${msg}`);
-    invoke('frontend_trace', { tag, msg }).catch(() => {});
-  }
+  function trace(tag: string, msg: string) { console.log(`[${tag}] ${msg}`); invoke('frontend_trace', { tag, msg }).catch(() => {}); }
 
   let settings: AppSettings = $state(structuredClone(DEFAULTS));
   let mails: MailSummary[] = $state([]);
-  let folderCache: Map<string, { mails: MailSummary[]; offset: number; hasMore: boolean }> = new Map();
+  let folderCache: FolderCache = new Map();
   let selectedMail: MailDetailType | null = $state(null);
   let selectedUid: number | null = $state(null);
   let loading = $state(false);
@@ -37,268 +38,81 @@
   let loadingMore = $state(false);
   let mailOffset = 0;
   let hasMore = $state(true);
-  function pageSize() { return settings.mailsPerPage ?? 200; }
   let calendarNames: string[] = $state([]);
-  let updateAvailable: { version: string; doUpdate: () => Promise<void> } | null = $state(null);
-  let updateProgress: { status: 'downloading' | 'installing'; percent: number } | null = $state(null);
-
   let searchResults: MailSummary[] | null = $state(null);
   let searching = $state(false);
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let selectedUids: Set<number> = $state(new Set());
+  let lastUndo: (() => void) | null = null;
 
-  let filteredMails: MailSummary[] = $derived(
-    searchResults !== null ? searchResults : mails
-  );
-
-  function onSearchInput(q: string) {
-    searchQuery = q;
-    if (searchTimer) clearTimeout(searchTimer);
-    if (!q.trim()) { searchResults = null; searching = false; return; }
-    searching = true;
-    searchTimer = setTimeout(() => doSearch(q), 400);
-  }
-
-  async function doSearch(q: string) {
-    const a = acc(); if (!a) { searching = false; return; }
-    await ensureValidToken();
-    try {
-      const folder = activeFolder;
-      const results = await invoke<MailSummary[]>('search_mails', { config: getImapConfig(a), folder, query: q, limit: 100 });
-      if (searchQuery !== q) return;
-      searchResults = results;
-    } catch (e) { trace('SEARCH', `error: ${e}`); searchResults = null; }
-    finally { searching = false; }
-  }
+  const filteredMails = $derived(searchResults !== null ? searchResults : mails);
+  const ps = $derived(settings.mailsPerPage ?? 200);
 
   function acc() { return settings.accounts?.[settings.activeAccountIndex] ?? null; }
   function llm() { return getLlmConfig(settings.llm); }
-
-  async function ensureValidToken() {
-    const a = acc();
-    if (!a || a.auth_type !== 'oauth') return;
-    const now = Math.floor(Date.now() / 1000);
-    if (a.token_expires_at > now + 60) return;
-    try {
-      const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>('google_oauth_refresh', { refreshToken: a.refresh_token });
-      a.access_token = tokens.access_token;
-      a.token_expires_at = tokens.expires_at;
-      settings.accounts[settings.activeAccountIndex] = { ...a };
-      await saveSettings(settings);
-    } catch (e) { throw new Error('トークン更新失敗: ' + String(e)); }
+  function cacheKey(f: string) { return `${settings.activeAccountIndex}:${f}`; }
+  function saveFolderCache() { folderCache.set(cacheKey(activeFolder), { mails: [...mails], offset: mailOffset, hasMore }); }
+  async function ensureValidToken() { await refreshOAuthToken(settings, settings.activeAccountIndex); }
+  function showToast(msg: string, undo?: () => void) {
+    toast = { msg, undo }; if (undo) lastUndo = undo;
+    setTimeout(() => { toast = null; }, 5000);
+    if (undo) setTimeout(() => { if (lastUndo === undo) lastUndo = null; }, 5000);
   }
 
-  onMount(async () => {
-    trace('MOUNT', 'start');
-    try { settings = await loadSettings(); trace('MOUNT', `loadSettings ok, accounts: ${settings.accounts.length}`); }
-    catch (e) { trace('MOUNT', `loadSettings FAILED: ${e}`); }
-    invoke('set_ai_budget', { limitUsd: settings.aiBudgetLimitUsd ?? 0 }).catch(() => {});
-    if (acc()) {
-      await fetchMails(); startPolling();
-      prefetchAllFolders();
-      fetchCalendarNames();
-    }
-    try {
-      const { isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
-      const granted = await isPermissionGranted();
-      if (!granted) await requestPermission();
-      trace('MOUNT', 'notification ok');
-    } catch (e) { trace('MOUNT', `notification skip: ${e}`); }
-    trace('MOUNT', 'done');
-
-    // Check for updates
-    try {
-      const update = await check();
-      if (update) {
-        trace('UPDATE', `new version available: ${update.version}`);
-        updateAvailable = {
-          version: update.version,
-          doUpdate: async () => {
-            try {
-              trace('UPDATE', 'downloading...');
-              updateProgress = { status: 'downloading', percent: 0 };
-              let downloaded = 0;
-              let total = 0;
-              await update.downloadAndInstall((event) => {
-                switch (event.event) {
-                  case 'Started':
-                    total = event.data.contentLength ?? 0;
-                    break;
-                  case 'Progress':
-                    downloaded += event.data.chunkLength;
-                    updateProgress = { status: 'downloading', percent: total > 0 ? Math.round((downloaded / total) * 100) : 0 };
-                    break;
-                  case 'Finished':
-                    updateProgress = { status: 'installing', percent: 100 };
-                    break;
-                }
-              });
-              trace('UPDATE', 'installed, relaunching...');
-              await relaunch();
-            } catch (e) {
-              trace('UPDATE', `install failed: ${e}`);
-              updateProgress = null;
-              error = `アップデート失敗: ${e}`;
-            }
-          }
-        };
-      }
-    } catch (e) { trace('UPDATE', `check failed: ${e}`); }
-
-    // Intercept link clicks in mail body → open in system browser
-    document.addEventListener('click', handleLinkClick);
-  });
-
-  function handleLinkClick(e: MouseEvent) {
-    const a = (e.target as HTMLElement)?.closest('a[href]') as HTMLAnchorElement | null;
-    if (!a) return;
-    const href = a.getAttribute('href');
-    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-      e.preventDefault();
-      invoke('open_external_url', { url: href }).catch(() => {});
-    }
+  function onSearchInput(q: string) {
+    searchQuery = q; if (searchTimer) clearTimeout(searchTimer);
+    if (!q.trim()) { searchResults = null; searching = false; return; }
+    searching = true;
+    searchTimer = setTimeout(async () => {
+      const a = acc(); if (!a) { searching = false; return; }
+      await ensureValidToken();
+      try { const r = await invoke<MailSummary[]>('search_mails', { config: getImapConfig(a), folder: activeFolder, query: q, limit: 100 }); if (searchQuery === q) searchResults = r; }
+      catch { searchResults = null; } finally { searching = false; }
+    }, 400);
   }
 
-  onDestroy(() => {
-    if (pollTimer) clearInterval(pollTimer);
-    if (gTimer) clearTimeout(gTimer);
-    if (searchTimer) clearTimeout(searchTimer);
-    document.removeEventListener('click', handleLinkClick);
-  });
-
-  function startPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-    const interval = (acc()?.syncInterval ?? 5) * 60 * 1000;
-    pollTimer = setInterval(async () => {
-      await fetchNewMails();
-    }, interval);
+  async function fetchMails() {
+    const a = acc(); if (!a) return;
+    await ensureValidToken(); loading = true; syncing = true; syncStatus = ''; error = null; mailOffset = 0; hasMore = true;
+    try {
+      const [result, total] = await fetchMailPage(settings, activeFolder, 0, ps * 2);
+      mails = result; mailOffset = result.length; hasMore = mailOffset < total; saveFolderCache();
+      syncStatus = `${result.length}/${total}件 同期完了`; setTimeout(() => { syncStatus = ''; }, 3000);
+      if (result.length > 0) invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: result.map(m => m.uid) }).catch(() => {});
+    } catch (e) { error = String(e); syncStatus = '同期失敗'; } finally { loading = false; syncing = false; }
   }
 
   async function fetchNewMails() {
     const a = acc(); if (!a) return;
     if (mails.length === 0) { await fetchMails(); return; }
     await ensureValidToken();
-    const maxUid = Math.max(...mails.map(m => m.uid));
-    const folder = activeFolder;
     try {
-      const newMails = await invoke<MailSummary[]>('fetch_new_mails', { config: getImapConfig(a), folder, sinceUid: maxUid });
+      const newMails = await fetchNewMailsSince(settings, activeFolder, Math.max(...mails.map(m => m.uid)));
       if (newMails.length > 0) {
-        mails = [...newMails, ...mails];
-        syncStatus = `${newMails.length}件の新着`;
-        setTimeout(() => { syncStatus = ''; }, 3000);
-        // Preload new mails
-        const preloadUids = newMails.map(m => m.uid);
-        invoke('preload_mails', { config: getImapConfig(a), folder, uids: preloadUids }).catch(() => {});
-        // Notification
-        if (acc()?.notifications) {
-          try {
-            const { sendNotification } = await import('@tauri-apps/plugin-notification');
-            const latest = newMails[0];
-            const body = newMails.length === 1
-              ? `${latest.from}: ${latest.subject}`
-              : `${latest.from}: ${latest.subject} 他${newMails.length - 1}件`;
-            const opts: Parameters<typeof sendNotification>[0] = { title: 'SmartAM', body };
-            if (!acc()?.notificationSound) opts.silent = true;
-            sendNotification(opts);
-            if (acc()?.notificationBadge) {
-              const { getCurrentWindow } = await import('@tauri-apps/api/window');
-              const unread = mails.filter(m => !m.seen).length;
-              await getCurrentWindow().setBadgeCount(unread || undefined);
-            }
-          } catch (e) { trace('NOTIFY', `sendNotification error: ${e}`); }
-        }
+        mails = [...newMails, ...mails]; syncStatus = `${newMails.length}件の新着`; setTimeout(() => { syncStatus = ''; }, 3000);
+        invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: newMails.map(m => m.uid) }).catch(() => {});
+        await sendNotificationForNewMails(settings, newMails, mails, trace);
       }
     } catch (e) { trace('POLL', `fetch_new_mails error: ${e}`); }
   }
 
-  function cacheKey(folder: string) { return `${settings.activeAccountIndex}:${folder}`; }
-
-  function saveFolderCache() {
-    folderCache.set(cacheKey(activeFolder), { mails: [...mails], offset: mailOffset, hasMore });
-  }
-
-  async function fetchMails() {
-    const a = acc(); if (!a) return;
-    await ensureValidToken();
-    loading = true; syncing = true; syncStatus = ''; error = null;
-    mailOffset = 0; hasMore = true;
-    try {
-      const folder = activeFolder;
-      const initCount = pageSize() * 2;
-      const [result, total] = await invoke<[MailSummary[], number]>('fetch_mail_page', { config: getImapConfig(a), folder, offset: 0, limit: initCount });
-      mails = result;
-      mailOffset = result.length;
-      hasMore = mailOffset < total;
-      saveFolderCache();
-      syncStatus = `${result.length}/${total}件 同期完了`;
-      setTimeout(() => { syncStatus = ''; }, 3000);
-      if (result.length > 0) {
-        const preloadUids = result.map(m => m.uid);
-        invoke('preload_mails', { config: getImapConfig(a), folder, uids: preloadUids }).catch(() => {});
-      }
-    } catch (e) { error = String(e); syncStatus = '同期失敗'; }
-    finally { loading = false; syncing = false; }
-  }
-
   async function loadMoreMails() {
-    if (!hasMore || loadingMore) return;
-    const a = acc(); if (!a) return;
-    await ensureValidToken();
-    loadingMore = true;
+    if (!hasMore || loadingMore) return; const a = acc(); if (!a) return;
+    await ensureValidToken(); loadingMore = true;
     try {
-      const folder = activeFolder;
-      const [page, total] = await invoke<[MailSummary[], number]>('fetch_mail_page', { config: getImapConfig(a), folder, offset: mailOffset, limit: pageSize() });
+      const [page, total] = await fetchMailPage(settings, activeFolder, mailOffset, ps);
       if (page.length === 0) { hasMore = false; }
-      else {
-        mails = [...mails, ...page];
-        mailOffset += page.length;
-        hasMore = mailOffset < total;
-        saveFolderCache();
-        const newUids = page.map(m => m.uid);
-        invoke('preload_mails', { config: getImapConfig(a), folder, uids: newUids }).catch(() => {});
-      }
-    } catch (e) { error = String(e); }
-    finally { loadingMore = false; }
+      else { mails = [...mails, ...page]; mailOffset += page.length; hasMore = mailOffset < total; saveFolderCache(); invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: page.map(m => m.uid) }).catch(() => {}); }
+    } catch (e) { error = String(e); } finally { loadingMore = false; }
   }
 
-  async function prefetchAllFolders() {
-    const allFolders = ['INBOX', 'STARRED', 'SENT', 'DRAFTS', 'ALL', 'SPAM', 'TRASH'];
-    for (let i = 0; i < settings.accounts.length; i++) {
-      const a = settings.accounts[i];
-      if (!a) continue;
-      for (const folder of allFolders) {
-        const key = `${i}:${folder}`;
-        if (folderCache.has(key)) continue;
-        try {
-          if (a.auth_type === 'oauth') {
-            const now = Math.floor(Date.now() / 1000);
-            if (a.token_expires_at <= now + 60) {
-              const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>('google_oauth_refresh', { refreshToken: a.refresh_token });
-              a.access_token = tokens.access_token;
-              a.token_expires_at = tokens.expires_at;
-              settings.accounts[i] = { ...a };
-              await saveSettings(settings);
-            }
-          }
-          const [result, total] = await invoke<[MailSummary[], number]>('fetch_mail_page', { config: getImapConfig(a), folder, offset: 0, limit: pageSize() * 2 });
-          folderCache.set(key, { mails: result, offset: result.length, hasMore: result.length < total });
-          trace('PREFETCH', `${a.email}/${folder}: ${result.length}/${total}`);
-        } catch (e) { trace('PREFETCH', `${a.email}/${folder} failed: ${e}`); }
-      }
-    }
-  }
+  function startPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = setInterval(fetchNewMails, (acc()?.syncInterval ?? 5) * 60 * 1000); }
 
   function fetchCalendarNames() {
     const a = acc();
     if (a?.auth_type === 'oauth' && a.access_token) {
       invoke<string[]>('list_google_calendars', { accessToken: a.access_token })
-        .then(names => {
-          calendarNames = names;
-          if (names.length > 0 && !a.calendar?.calendarName) {
-            if (!a.calendar) return;
-            a.calendar.calendarName = names[0];
-          }
-        })
+        .then(names => { calendarNames = names; if (names.length > 0 && !a.calendar?.calendarName && a.calendar) a.calendar.calendarName = names[0]; })
         .catch(() => { calendarNames = []; });
     } else { calendarNames = []; }
   }
@@ -306,397 +120,170 @@
   async function handleFolderChange(folder: string, accountIndex?: number) {
     saveFolderCache();
     if (accountIndex !== undefined) { settings.activeAccountIndex = accountIndex; fetchCalendarNames(); selectedUids = new Set(); startPolling(); }
-    activeFolder = folder;
-    selectedMail = null; selectedUid = null;
-    searchQuery = ''; searchResults = null;
-
-    // Restore from cache if available
+    activeFolder = folder; selectedMail = null; selectedUid = null; searchQuery = ''; searchResults = null;
     const cached = folderCache.get(cacheKey(folder));
-    if (cached) {
-      mails = cached.mails;
-      mailOffset = cached.offset;
-      hasMore = cached.hasMore;
-      // Background: check for new mails
-      fetchNewMails();
-    } else {
-      await fetchMails();
-    }
+    if (cached) { mails = cached.mails; mailOffset = cached.offset; hasMore = cached.hasMore; fetchNewMails(); } else { await fetchMails(); }
   }
 
   async function handleSelect(uid: number) {
     const a = acc(); if (!a) return;
-    const t0 = performance.now();
-    await ensureValidToken();
-    const t1 = performance.now();
-    selectedUid = uid;
-    const folder = activeFolder;
+    const t0 = performance.now(); await ensureValidToken(); const t1 = performance.now(); selectedUid = uid;
     try {
-      const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder, uid });
-      if (selectedUid !== uid) return;
-      selectedMail = detail;
-      const m = mails.find(x => x.uid === uid);
-      if (m && !m.seen) { m.seen = true; mails = mails; }
-      const t2 = performance.now();
-      trace('PERF', `select uid=${uid}: token=${(t1-t0)|0}ms, fetch=${(t2-t1)|0}ms, total=${(t2-t0)|0}ms`);
-      // Preload surrounding mails in background
+      const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder: activeFolder, uid });
+      if (selectedUid !== uid) return; selectedMail = detail;
+      const m = mails.find(x => x.uid === uid); if (m && !m.seen) { m.seen = true; mails = mails; }
+      trace('PERF', `select uid=${uid}: token=${(t1-t0)|0}ms, fetch=${(performance.now()-t1)|0}ms`);
       const idx = mails.findIndex(m => m.uid === uid);
-      if (idx >= 0) {
-        const start = Math.max(0, idx - 15);
-        const end = Math.min(mails.length, idx + 16);
-        const nearby = mails.slice(start, end).map(m => m.uid).filter(u => u !== uid);
-        if (nearby.length > 0) {
-          invoke('preload_mails', { config: getImapConfig(a), folder, uids: nearby }).catch(() => {});
-        }
-      }
-    }
-    catch (e) { error = String(e); }
+      if (idx >= 0) { const nearby = mails.slice(Math.max(0, idx - 15), Math.min(mails.length, idx + 16)).map(m => m.uid).filter(u => u !== uid); if (nearby.length > 0) invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: nearby }).catch(() => {}); }
+    } catch (e) { error = String(e); }
   }
-
 
   async function handleArchive() {
     const a = acc(); if (!a || !selectedUid) return;
-    const uid = selectedUid;
-    const idx = mails.findIndex(m => m.uid === uid);
-    const prevMails = mails;
-
-    // Optimistic: remove immediately
+    const uid = selectedUid; const idx = mails.findIndex(m => m.uid === uid); const prevMails = mails;
     mails = mails.filter(m => m.uid !== uid);
-    const next = mails[idx] ?? mails[idx - 1];
-    if (next) { handleSelect(next.uid); } else { selectedMail = null; selectedUid = null; }
-
-    // Fire-and-forget IMAP with retry
+    const next = mails[idx] ?? mails[idx - 1]; if (next) handleSelect(next.uid); else { selectedMail = null; selectedUid = null; }
     let aborted = false;
     showToast('📦 アーカイブしました', () => { aborted = true; mails = prevMails; handleSelect(uid); });
-
-    const doArchive = async (attempt: number) => {
-      if (aborted) return;
-      try {
-        await ensureValidToken();
-        await invoke('archive_mail', { config: getImapConfig(a), folder: activeFolder, uid });
-      } catch (e) {
-        if (aborted) return;
-        if (attempt < 10) { setTimeout(() => doArchive(attempt + 1), 1000 * attempt); }
-        else { mails = prevMails; handleSelect(uid); error = 'アーカイブ失敗: ' + String(e); }
-      }
-    };
-    doArchive(1);
+    archiveMail(a, activeFolder, uid, 1, () => aborted).catch(e => { mails = prevMails; handleSelect(uid); error = 'アーカイブ失敗: ' + String(e); });
   }
 
   async function handleBulkArchive() {
     const a = acc(); if (!a || selectedUids.size === 0) return;
-    const uids = [...selectedUids];
-    const prevMails = mails;
-    mails = mails.filter(m => !selectedUids.has(m.uid));
-    selectedMail = null; selectedUid = null;
-    const count = uids.length;
-    selectedUids = new Set();
+    const uids = [...selectedUids]; const prevMails = mails; const count = uids.length;
+    mails = mails.filter(m => !selectedUids.has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
     showToast(`📦 ${count}件アーカイブしました`, () => { mails = prevMails; selectedUids = new Set(uids); });
-    for (const uid of uids) {
-      const doArchive = async (attempt: number) => {
-        try {
-          await ensureValidToken();
-          await invoke('archive_mail', { config: getImapConfig(a), folder: activeFolder, uid });
-        } catch (e) {
-          if (attempt < 10) setTimeout(() => doArchive(attempt + 1), 1000 * attempt);
-        }
-      };
-      doArchive(1);
-    }
+    for (const uid of uids) archiveMail(a, activeFolder, uid, 1, () => false).catch(() => {});
   }
 
   async function handleBulkDelete() {
     const a = acc(); if (!a || selectedUids.size === 0) return;
-    const uids = [...selectedUids];
-    await ensureValidToken();
-    for (const uid of uids) {
-      try { await invoke('delete_mail', { config: getImapConfig(a), folder: activeFolder, uid }); } catch {}
-    }
-    const uidSet = new Set(uids);
-    mails = mails.filter(m => !uidSet.has(m.uid));
-    selectedMail = null; selectedUid = null; selectedUids = new Set();
+    const uids = [...selectedUids]; await ensureValidToken();
+    for (const uid of uids) { try { await deleteMail(a, activeFolder, uid); } catch {} }
+    mails = mails.filter(m => !new Set(uids).has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
     showToast(`🗑 ${uids.length}件削除しました`);
   }
 
   async function handleBulkStar(add: boolean) {
-    const a = acc(); if (!a || selectedUids.size === 0) return;
-    await ensureValidToken();
-    for (const uid of [...selectedUids]) {
-      try { await invoke('toggle_star', { config: getImapConfig(a), folder: activeFolder, uid, add }); } catch {}
-    }
-    showToast(add ? `⭐ ${selectedUids.size}件にスター追加` : `⭐ ${selectedUids.size}件のスター解除`);
-    selectedUids = new Set();
+    const a = acc(); if (!a || selectedUids.size === 0) return; await ensureValidToken();
+    for (const uid of [...selectedUids]) { try { await toggleStar(a, activeFolder, uid, add); } catch {} }
+    showToast(add ? `⭐ ${selectedUids.size}件にスター追加` : `⭐ ${selectedUids.size}件のスター解除`); selectedUids = new Set();
   }
 
-  function handleDeleteConfirm() { confirmDelete = true; }
   async function handleDeleteExecute() {
-    confirmDelete = false;
-    const a = acc(); if (!a || !selectedUid) return;
-    await ensureValidToken();
-    try {
-      await invoke('delete_mail', { config: getImapConfig(a), folder: activeFolder, uid: selectedUid });
-      mails = mails.filter(m => m.uid !== selectedUid);
-      selectedMail = null; selectedUid = null;
-      showToast('🗑 削除しました');
-    } catch (e) { error = String(e); }
+    confirmDelete = false; const a = acc(); if (!a || !selectedUid) return; await ensureValidToken();
+    try { await deleteMail(a, activeFolder, selectedUid); mails = mails.filter(m => m.uid !== selectedUid); selectedMail = null; selectedUid = null; showToast('🗑 削除しました'); }
+    catch (e) { error = String(e); }
   }
 
   async function handleStar(add: boolean) {
-    const a = acc(); if (!a || !selectedUid) return;
-    await ensureValidToken();
-    try {
-      await invoke('toggle_star', { config: getImapConfig(a), folder: activeFolder, uid: selectedUid, add });
-      showToast(add ? '⭐ スター追加' : '⭐ スター解除');
-    } catch (e) { error = String(e); }
+    const a = acc(); if (!a || !selectedUid) return; await ensureValidToken();
+    try { await toggleStar(a, activeFolder, selectedUid, add); showToast(add ? '⭐ スター追加' : '⭐ スター解除'); } catch (e) { error = String(e); }
   }
 
   async function handleDownloadAttachment(partIndex: number, filename: string) {
-    const a = acc(); if (!a || !selectedUid) return;
-    await ensureValidToken();
-    try {
-      const path = await invoke<string>('download_attachment', {
-        config: getImapConfig(a), folder: activeFolder, uid: selectedUid, partIndex, filename
-      });
-      showToast(`⬇ ${filename} を保存しました: ${path}`);
-    } catch (e) { error = String(e); }
+    const a = acc(); if (!a || !selectedUid) return; await ensureValidToken();
+    try { showToast(`⬇ ${filename} を保存しました: ${await downloadAttachment(a, activeFolder, selectedUid, partIndex, filename)}`); } catch (e) { error = String(e); }
   }
 
   function openReply(presetBody?: string) { composeBody = presetBody ?? ''; composeMode = 'reply'; attachmentPaths = []; }
 
   async function handleSend(data: { to: string; cc: string; bcc: string; subject: string; body: string }) {
-    const a = acc(); if (!a) return;
-    await ensureValidToken();
-    try {
-      const toArr = data.to.split(',').map(s => s.trim()).filter(Boolean);
-      const ccArr = data.cc.split(',').map(s => s.trim()).filter(Boolean);
-      const bccArr = data.bcc.split(',').map(s => s.trim()).filter(Boolean);
-      if (attachmentPaths.length > 0) {
-        await invoke('send_mail_with_attachments', {
-          config: getSmtpConfig(a), to: toArr, cc: ccArr, bcc: bccArr,
-          subject: data.subject, body: data.body, attachmentPaths
-        });
-      } else {
-        await invoke('send_mail', {
-          config: getSmtpConfig(a), to: toArr, cc: ccArr, bcc: bccArr,
-          subject: data.subject, body: data.body
-        });
-      }
-      composeMode = null; attachmentPaths = [];
-      showToast('✅ メールを送信しました');
-    } catch (e) { error = String(e); }
-  }
-
-  function showToast(msg: string, undo?: () => void) {
-    toast = { msg, undo }; if (undo) lastUndo = undo; setTimeout(() => toast = null, 5000);
-    if (undo) setTimeout(() => { if (lastUndo === undo) lastUndo = null; }, 5000);
-  }
-
-  // --- Keyboard shortcuts ---
-  let gPending = $state(false);
-  let gTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastUndo: (() => void) | null = null;
-
-  function sc() { return settings.shortcuts; }
-
-  function reverseMap(): Map<string, string> {
-    const m = new Map<string, string>();
-    for (const [action, key] of Object.entries(sc())) m.set(key, action);
-    return m;
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if (showSettings || composeMode) return;
-
-    const s = sc();
-    const key = e.key;
-
-    // g-sequence
-    if (gPending) {
-      gPending = false;
-      if (gTimer) { clearTimeout(gTimer); gTimer = null; }
-      const combo = `g ${key}`;
-      const rm = reverseMap();
-      const action = rm.get(combo);
-      if (action) { e.preventDefault(); execAction(action); }
-      return;
-    }
-    if (key === 'g' && Object.values(s).some(v => v.startsWith('g '))) {
-      gPending = true;
-      gTimer = setTimeout(() => { gPending = false; }, 1000);
-      return;
-    }
-
-    // Arrow keys: navigate mails when detail is open
-    if (selectedMail && (key === 'ArrowDown' || key === 'ArrowUp')) {
-      e.preventDefault();
-      execAction(key === 'ArrowDown' ? 'nextMail' : 'prevMail');
-      return;
-    }
-
-    const rm = reverseMap();
-    const action = rm.get(key);
-    if (action) { e.preventDefault(); execAction(action); }
+    const a = acc(); if (!a) return; await ensureValidToken();
+    try { await sendMail(a, data, attachmentPaths); composeMode = null; attachmentPaths = []; showToast('✅ メールを送信しました'); } catch (e) { error = String(e); }
   }
 
   function execAction(action: string) {
-    // Bulk operations when multiple mails are selected
-    if (selectedUids.size > 0) {
-      switch (action) {
-        case 'archive': handleBulkArchive(); return;
-        case 'delete': handleBulkDelete(); return;
-        case 'star': handleBulkStar(true); return;
-      }
-    }
+    if (selectedUids.size > 0 && action === 'archive') { handleBulkArchive(); return; }
+    if (selectedUids.size > 0 && action === 'delete') { handleBulkDelete(); return; }
+    if (selectedUids.size > 0 && action === 'star') { handleBulkStar(true); return; }
     const idx = mails.findIndex(m => m.uid === selectedUid);
-    switch (action) {
-      case 'nextMail':
-        if (idx >= 0 && idx < mails.length - 1) handleSelect(mails[idx + 1].uid);
-        else if (idx === -1 && mails.length > 0) handleSelect(mails[0].uid);
-        break;
-      case 'prevMail':
-        if (idx > 0) handleSelect(mails[idx - 1].uid);
-        break;
-      case 'openMail':
-        if (selectedUid && !selectedMail) handleSelect(selectedUid);
-        break;
-      case 'backToList':
-        selectedMail = null; selectedUid = null;
-        break;
-      case 'reply': if (selectedMail) openReply(); break;
-      case 'forward': if (selectedMail) { composeBody = `\n\n---------- Forwarded ----------\n${selectedMail.body_text ?? ''}`; composeMode = 'forward'; } break;
-      case 'archive': if (selectedMail) handleArchive(); break;
-      case 'delete': if (selectedMail) handleDeleteConfirm(); break;
-      case 'star': if (selectedUid) { const next = !((selectedMail as any)?.starred ?? false); handleStar(next); } break;
-      case 'undo': if (lastUndo) { lastUndo(); lastUndo = null; } break;
-      case 'compose': composeBody = ''; composeMode = 'new'; attachmentPaths = []; break;
-      case 'search': document.querySelector<HTMLInputElement>('.mail-list input')?.focus(); break;
-      case 'goInbox': handleFolderChange('INBOX'); break;
-      case 'goStarred': handleFolderChange('STARRED'); break;
-      case 'goSent': handleFolderChange('SENT'); break;
-      case 'goDrafts': handleFolderChange('DRAFTS'); break;
-      case 'goAll': handleFolderChange('ALL'); break;
-      case 'aiSummary': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="AI要約"]')?.click(); break;
-      case 'aiDraft': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="返信下書き"]')?.click(); break;
-      case 'aiTranslate': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="翻訳"]')?.click(); break;
-      case 'aiCalendar': if (selectedMail) document.querySelector<HTMLButtonElement>('[title="カレンダー登録"]')?.click(); break;
-      case 'acceptInvite': document.querySelector<HTMLButtonElement>('.btn-accept:not(:disabled)')?.click(); break;
-      case 'declineInvite': document.querySelector<HTMLButtonElement>('.btn-decline:not(:disabled)')?.click(); break;
-    }
+    const btn = (s: string) => document.querySelector<HTMLButtonElement>(s)?.click();
+    ({
+      nextMail: () => { if (idx >= 0 && idx < mails.length - 1) handleSelect(mails[idx + 1].uid); else if (idx === -1 && mails.length > 0) handleSelect(mails[0].uid); },
+      prevMail: () => { if (idx > 0) handleSelect(mails[idx - 1].uid); },
+      openMail: () => { if (selectedUid && !selectedMail) handleSelect(selectedUid); },
+      backToList: () => { selectedMail = null; selectedUid = null; },
+      reply: () => { if (selectedMail) openReply(); },
+      forward: () => { if (selectedMail) { composeBody = `\n\n---------- Forwarded ----------\n${selectedMail.body_text ?? ''}`; composeMode = 'forward'; } },
+      archive: () => { if (selectedMail) handleArchive(); },
+      delete: () => { if (selectedMail) confirmDelete = true; },
+      star: () => { if (selectedUid) handleStar(!((selectedMail as any)?.starred ?? false)); },
+      undo: () => { if (lastUndo) { lastUndo(); lastUndo = null; } },
+      compose: () => { composeBody = ''; composeMode = 'new'; attachmentPaths = []; },
+      search: () => document.querySelector<HTMLInputElement>('.mail-list input')?.focus(),
+      goInbox: () => handleFolderChange('INBOX'), goStarred: () => handleFolderChange('STARRED'),
+      goSent: () => handleFolderChange('SENT'), goDrafts: () => handleFolderChange('DRAFTS'), goAll: () => handleFolderChange('ALL'),
+      aiSummary: () => { if (selectedMail) btn('[title="AI要約"]'); },
+      aiDraft: () => { if (selectedMail) btn('[title="返信下書き"]'); },
+      aiTranslate: () => { if (selectedMail) btn('[title="翻訳"]'); },
+      aiCalendar: () => { if (selectedMail) btn('[title="カレンダー登録"]'); },
+      acceptInvite: () => btn('.btn-accept:not(:disabled)'), declineInvite: () => btn('.btn-decline:not(:disabled)'),
+    } as Record<string, () => void>)[action]?.();
   }
+
+  onMount(async () => {
+    trace('MOUNT', 'start');
+    try { settings = await loadSettings(); } catch (e) { trace('MOUNT', `loadSettings FAILED: ${e}`); }
+    invoke('set_ai_budget', { limitUsd: settings.aiBudgetLimitUsd ?? 0 }).catch(() => {});
+    invoke('set_log_level', { level: settings.logLevel ?? 'info' }).catch(() => {});
+    if (acc()) { await fetchMails(); startPolling(); prefetchAllFolders(settings, folderCache, ps, trace); fetchCalendarNames(); }
+    try { const { isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification'); if (!await isPermissionGranted()) await requestPermission(); } catch {}
+    document.addEventListener('click', handleLinkClick);
+    trace('MOUNT', 'done');
+  });
+
+  function handleLinkClick(e: MouseEvent) {
+    const a = (e.target as HTMLElement)?.closest('a[href]') as HTMLAnchorElement | null; if (!a) return;
+    const href = a.getAttribute('href');
+    if (href?.startsWith('http://') || href?.startsWith('https://')) { e.preventDefault(); invoke('open_external_url', { url: href }).catch(() => {}); }
+  }
+
+  onDestroy(() => { if (pollTimer) clearInterval(pollTimer); if (searchTimer) clearTimeout(searchTimer); document.removeEventListener('click', handleLinkClick); });
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<ShortcutManager shortcuts={settings.shortcuts} onAction={execAction} disabled={showSettings || !!composeMode} />
 
 <div class="layout">
   <Sidebar
     onOpenSettings={() => { trace('BTN', 'settings clicked'); showSettings = true; }}
     onCompose={() => { composeBody = ''; composeMode = 'new'; attachmentPaths = []; }}
-    onRefresh={fetchNewMails}
-    onFolderSelect={(i, folder) => handleFolderChange(folder, i)}
-    {activeFolder}
-    accounts={settings?.accounts ?? []}
-    activeAccountIndex={settings?.activeAccountIndex ?? 0}
+    onRefresh={fetchNewMails} onFolderSelect={(i, folder) => handleFolderChange(folder, i)}
+    {activeFolder} accounts={settings?.accounts ?? []} activeAccountIndex={settings?.activeAccountIndex ?? 0}
     llmLabel={settings ? `${settings.llm.activeProvider} (${settings.llm[settings.llm.activeProvider]?.model ?? ''})` : ''}
-    {syncing}
-    {syncStatus}
+    {syncing} {syncStatus}
   />
-  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={pageSize()} dateFormat={settings.dateFormat} timezone={settings.timezone} bind:selectedUids />
+  <MailList mails={filteredMails} {selectedUid} onSelect={handleSelect} onLoadMore={loadMoreMails} {loading} loadingMore={loadingMore || searching} bind:searchQuery onSearchInput={onSearchInput} pageSize={ps} dateFormat={settings.dateFormat} timezone={settings.timezone} bind:selectedUids />
   <MailDetail
-    mail={selectedMail}
-    onArchive={handleArchive}
-    onDelete={handleDeleteConfirm}
-    onStar={handleStar}
+    mail={selectedMail} onArchive={handleArchive} onDelete={() => confirmDelete = true} onStar={handleStar}
     onReply={() => openReply()}
     onForward={() => { composeBody = `\n\n---------- Forwarded ----------\n${selectedMail?.body_text ?? ''}`; composeMode = 'forward'; }}
-    onUseAiReply={(text) => openReply(text)}
-    onDownloadAttachment={handleDownloadAttachment}
-    onFetchAttachmentData={async (partIndex) => {
-      const a = acc(); if (!a || !selectedUid) throw new Error('no account');
-      await ensureValidToken();
-      return invoke<string>('fetch_attachment_data', { config: getImapConfig(a), folder: activeFolder, uid: selectedUid, partIndex });
-    }}
-    llmConfig={llm()}
-    smtpConfig={acc() ? getSmtpConfig(acc()!) : null}
-    calendarName={acc()?.calendar?.calendarName ?? '仕事'}
-    calendarProvider={acc()?.calendar?.provider ?? 'apple'}
-    {calendarNames}
-    dateFormat={settings.dateFormat}
-    timezone={settings.timezone}
+    onUseAiReply={(text) => openReply(text)} onDownloadAttachment={handleDownloadAttachment}
+    onFetchAttachmentData={async (partIndex) => { const a = acc(); if (!a || !selectedUid) throw new Error('no account'); await ensureValidToken(); return invoke<string>('fetch_attachment_data', { config: getImapConfig(a), folder: activeFolder, uid: selectedUid, partIndex }); }}
+    llmConfig={llm()} smtpConfig={acc() ? getSmtpConfig(acc()!) : null}
+    calendarName={acc()?.calendar?.calendarName ?? '仕事'} calendarProvider={acc()?.calendar?.provider ?? 'apple'}
+    {calendarNames} dateFormat={settings.dateFormat} timezone={settings.timezone}
   />
 </div>
 
 {#if confirmDelete}
-  <div class="dialog-overlay">
-    <div class="dialog">
-      <div class="dialog-title">メールを削除</div>
-      <p class="dialog-msg">「{selectedMail?.subject}」を削除しますか？<br/>この操作はゴミ箱に移動します。</p>
-      <div class="dialog-actions">
-        <button class="btn-cancel" onclick={() => confirmDelete = false}>キャンセル</button>
-        <button class="btn-delete" onclick={handleDeleteExecute}>削除する</button>
-      </div>
-    </div>
-  </div>
+  <ConfirmDeleteDialog subject={selectedMail?.subject ?? ''} onConfirm={handleDeleteExecute} onCancel={() => confirmDelete = false} />
 {/if}
 
 {#if composeMode}
-  <ComposeModal
-    mode={composeMode}
-    to={composeMode === 'reply' ? (selectedMail?.from.replace(/.*<(.+)>.*/, '$1') ?? '') : ''}
-    subject={selectedMail?.subject ?? ''}
-    body={composeBody}
-    signature={acc()?.signature ?? ''}
-    onClose={() => composeMode = null}
-    onSend={handleSend}
-    bind:attachmentPaths
-  />
+  <ComposeModal mode={composeMode} to={composeMode === 'reply' ? (selectedMail?.from.replace(/.*<(.+)>.*/, '$1') ?? '') : ''} subject={selectedMail?.subject ?? ''} body={composeBody} signature={acc()?.signature ?? ''} onClose={() => composeMode = null} onSend={handleSend} bind:attachmentPaths />
 {/if}
 
 {#if showSettings}
-  <Settings {settings} onClose={() => showSettings = false} onSave={async (s) => { try { const plain = JSON.parse(JSON.stringify(s)); await saveSettings(plain); settings = plain; invoke('set_ai_budget', { limitUsd: plain.aiBudgetLimitUsd ?? 0 }).catch(() => {}); showSettings = false; startPolling(); await fetchMails(); fetchCalendarNames(); } catch (e) { error = '設定の保存に失敗: ' + String(e); } }} />
+  <Settings {settings} onClose={() => showSettings = false} onSave={async (s) => {
+    try { const plain = JSON.parse(JSON.stringify(s)); await saveSettings(plain); settings = plain; invoke('set_ai_budget', { limitUsd: plain.aiBudgetLimitUsd ?? 0 }).catch(() => {}); showSettings = false; startPolling(); await fetchMails(); fetchCalendarNames(); }
+    catch (e) { error = '設定の保存に失敗: ' + String(e); }
+  }} />
 {/if}
 
-{#if updateAvailable && !updateProgress}
-  <div class="update-bar">🚀 v{updateAvailable.version} が利用可能です <button class="update-btn" onclick={updateAvailable.doUpdate}>アップデート</button><button class="update-dismiss" onclick={() => updateAvailable = null}>✕</button></div>
-{/if}
-{#if updateProgress}
-  <div class="update-overlay">
-    <div class="update-modal">
-      <div class="update-icon">⬇️</div>
-      <div class="update-title">{updateProgress.status === 'downloading' ? 'アップデートをダウンロード中...' : 'インストール中...'}</div>
-      <div class="update-progress-bar"><div class="update-progress-fill" style:width="{updateProgress.percent}%"></div></div>
-      <div class="update-percent">{updateProgress.percent}%</div>
-    </div>
-  </div>
-{/if}
-
-{#if toast}
-  <div class="toast-bar">{toast.msg}{#if toast.undo}<button class="undo" onclick={() => { toast?.undo?.(); toast = null; }}>元に戻す</button>{/if}</div>
-{/if}
-{#if error}<div class="toast-err">{error} <button onclick={() => error = null}>✕</button></div>{/if}
+<UpdateBanner onError={(msg) => error = msg} />
+<ToastNotification {toast} {error} onDismissToast={() => toast = null} onDismissError={() => error = null} />
 
 <style>
   .layout { display:flex;flex:1;height:100vh;overflow:hidden }
-  .dialog-overlay { position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:60 }
-  .dialog { background:var(--base);border:1px solid var(--red);border-radius:8px;padding:24px;width:380px;text-align:center }
-  .dialog-title { font-size:14px;font-weight:700;margin-bottom:12px }
-  .dialog-msg { font-size:12px;color:var(--text);margin-bottom:16px;line-height:1.5 }
-  .dialog-actions { display:flex;gap:8px;justify-content:center }
-  .btn-cancel { padding:8px 20px;border-radius:6px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);cursor:pointer }
-  .btn-delete { padding:8px 20px;border-radius:6px;border:none;background:var(--red);color:var(--base);font-weight:700;cursor:pointer }
-  .toast-bar { position:fixed;bottom:16px;right:16px;padding:10px 16px;background:#1e3a2e;color:var(--green);border:1px solid var(--green);border-radius:8px;font-size:12px;z-index:100;display:flex;gap:12px;align-items:center }
-  .undo { background:none;border:none;color:var(--blue);cursor:pointer;font-size:11px;text-decoration:underline }
-  .toast-err { position:fixed;bottom:56px;right:16px;padding:10px 16px;background:#3a1e1e;color:var(--red);border:1px solid var(--red);border-radius:8px;font-size:12px;z-index:100 }
-  .toast-err button { background:none;border:none;color:var(--red);cursor:pointer;margin-left:8px }
-  .update-bar { position:fixed;top:0;left:0;right:0;padding:8px 16px;background:var(--mauve);color:var(--base);font-size:12px;font-weight:700;text-align:center;z-index:200;display:flex;align-items:center;justify-content:center;gap:12px }
-  .update-btn { padding:4px 12px;border-radius:4px;border:none;background:var(--base);color:var(--mauve);font-weight:700;font-size:11px;cursor:pointer }
-  .update-dismiss { background:none;border:none;color:var(--base);cursor:pointer;font-size:14px;opacity:.7 }
-  .update-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center }
-  .update-modal { background:var(--mantle);border:1px solid var(--surface1);border-radius:12px;padding:32px 48px;text-align:center;min-width:300px }
-  .update-icon { font-size:32px;margin-bottom:12px }
-  .update-title { font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px }
-  .update-progress-bar { height:6px;background:var(--surface0);border-radius:3px;overflow:hidden }
-  .update-progress-fill { height:100%;background:var(--mauve);border-radius:3px;transition:width 0.2s }
-  .update-percent { font-size:11px;color:var(--overlay);margin-top:8px }
 </style>
