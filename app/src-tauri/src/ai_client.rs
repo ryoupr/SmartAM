@@ -97,16 +97,25 @@ async fn chat(config: &LlmConfig, messages: Vec<ChatMessage>, feature: &str) -> 
     }
 }
 
-// [中9] SSRFバリデーション
+// [中9] SSRFバリデーション（厳密ホスト検証）
 fn validate_base_url(url: &str) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://localhost") && !url.starts_with("http://127.0.0.1") {
-        return Err("LLM base_url must use HTTPS".into());
+    let parsed = url::Url::parse(url).map_err(|_| "Invalid base_url".to_string())?;
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let host = parsed.host_str().unwrap_or("");
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                Ok(())
+            } else {
+                Err("HTTP is only allowed for localhost".into())
+            }
+        }
+        _ => Err("LLM base_url must use HTTPS".into()),
     }
-    Ok(())
 }
 
-// [高2] timeout付きクライアント
-fn http_client() -> reqwest::Client {
+// [高2] timeout付きクライアント（pub for reuse in lib.rs）
+pub fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .connect_timeout(std::time::Duration::from_secs(10))
@@ -227,6 +236,10 @@ pub async fn draft_nuances(llm: &LlmConfig, mail_body: &str) -> Result<Vec<crate
         ChatMessage { role: "user".into(), content: mail_body.to_string() },
     ];
     let raw = chat(llm, messages, "draft_nuances").await?;
+    // Try full string first, then extract bracketed portion
+    if let Ok(parsed) = serde_json::from_str::<Vec<crate::Nuance>>(&raw) {
+        return Ok(parsed);
+    }
     let start = raw.find('[').ok_or("JSON配列が見つかりません")?;
     let end = raw.rfind(']').ok_or("JSON配列が見つかりません")? + 1;
     serde_json::from_str(&raw[start..end]).map_err(|e| format!("JSON解析失敗: {e}"))

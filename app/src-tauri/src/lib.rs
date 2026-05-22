@@ -217,7 +217,7 @@ async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<Stri
         return Err("不正なリージョン名です".into());
     }
     let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");
-    let client = reqwest::Client::new();
+    let client = ai_client::http_client();
     let resp = client.get(&url)
         .query(&[("byInferenceType", "ON_DEMAND")])
         .header("Authorization", format!("Bearer {api_key}"))
@@ -238,8 +238,8 @@ async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<Stri
 
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("無効なURLスキーム".into());
+    if !url.starts_with("https://") {
+        return Err("HTTPSのURLのみ開けます".into());
     }
     open::that(&url).map_err(|e| format!("URL open failed: {e}"))
 }
@@ -320,7 +320,7 @@ async fn google_oauth_refresh(refresh_token: String) -> Result<oauth::OAuthToken
 #[tauri::command]
 async fn list_google_calendars(access_token: String) -> Result<Vec<String>, String> {
     log::debug!("list_google_calendars");
-    let client = reqwest::Client::new();
+    let client = ai_client::http_client();
     let resp = client.get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
         .bearer_auth(&access_token)
         .send().await.map_err(|e| format!("{e}"))?;
@@ -375,7 +375,7 @@ async fn respond_calendar_invite(smtp: SmtpConfig, event: ics_parser::CalendarEv
 #[tauri::command]
 async fn check_calendar_conflicts(access_token: String, time_min: String, time_max: String, exclude_uid: String) -> Result<Vec<String>, String> {
     log::debug!("check_calendar_conflicts: {} ~ {}", time_min, time_max);
-    let client = reqwest::Client::new();
+    let client = ai_client::http_client();
     let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")
         .query(&[("timeMin", &time_min), ("timeMax", &time_max), ("singleEvents", &"true".to_string()), ("orderBy", &"startTime".to_string())])
         .bearer_auth(&access_token)
@@ -408,7 +408,7 @@ async fn check_calendar_conflicts(access_token: String, time_min: String, time_m
 
 #[tauri::command]
 async fn get_calendar_event_status(access_token: String, ics_uid: String, my_email: String) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = ai_client::http_client();
     let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")
         .query(&[("iCalUID", &ics_uid)])
         .bearer_auth(&access_token)
@@ -436,7 +436,7 @@ async fn get_calendar_event_status(access_token: String, ics_uid: String, my_ema
 async fn respond_google_calendar_invite(access_token: String, ics_uid: String, my_email: String, accept: bool) -> Result<String, String> {
     let status = if accept { "accepted" } else { "declined" };
     log::debug!("respond_google_calendar_invite: {} {}", ics_uid, status);
-    let client = reqwest::Client::new();
+    let client = ai_client::http_client();
 
     // 1. iCalUID でイベントを検索
     let resp = client.get("https://www.googleapis.com/calendar/v3/calendars/primary/events")

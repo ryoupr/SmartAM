@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::os::unix::fs::OpenOptionsExt;
 use std::sync::{LazyLock, Mutex};
 use chrono::Datelike;
@@ -19,7 +19,7 @@ const MAX_MONTHLY_MONTHS: usize = 24;
 pub struct AiUsageStore {
     pub monthly: HashMap<String, MonthlyUsage>,
     #[serde(default)]
-    pub daily: HashMap<String, DailyUsage>,
+    pub daily: BTreeMap<String, DailyUsage>,
     #[serde(default)]
     pub history: VecDeque<UsageLogEntry>,
 }
@@ -94,6 +94,7 @@ pub struct DailyCostEntry {
     pub date: String,
     pub cost_usd: f64,
     pub requests: u64,
+    pub is_estimated: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -121,10 +122,18 @@ impl AiUsageStore {
             Ok(p) => p,
             Err(e) => { log::error!("usage_file error: {e}"); return Self::default(); }
         };
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        match std::fs::read_to_string(&path) {
+            Ok(s) => match serde_json::from_str(&s) {
+                Ok(store) => store,
+                Err(e) => {
+                    log::error!("ai_usage.json parse error: {e}, creating backup");
+                    let bak = path.with_extension("json.bak");
+                    let _ = std::fs::copy(&path, &bak);
+                    Self::default()
+                }
+            },
+            Err(_) => Self::default(),
+        }
     }
 
     // [高3] Result返却 + [中16] パーミッション0o600
@@ -188,7 +197,8 @@ pub fn record_usage(model: &str, input_tokens: u64, output_tokens: u64, feature:
     let pricing = get_pricing(model);
     let cost_usd = input_tokens as f64 / 1000.0 * pricing.input_per_1k
         + output_tokens as f64 / 1000.0 * pricing.output_per_1k;
-    let cost_microcents = (cost_usd * 1_000_000.0) as u64;
+    if !cost_usd.is_finite() { return; }
+    let cost_microcents = (cost_usd * 1_000_000.0).round() as u64;
 
     let snapshot = {
         let mut store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
@@ -254,8 +264,11 @@ pub fn get_summary_for_month(month: &str) -> Result<UsageSummary, String> {
 
 // [中11] days バリデーション
 pub fn get_daily_costs(days: u32) -> Vec<DailyCostEntry> {
-    let days = days.min(365);
-    let store = USAGE.lock().unwrap_or_else(|e| e.into_inner());
+    let days = days.min(MAX_DAILY_DAYS as u32);
+    let store = match USAGE.lock() {
+        Ok(s) => s,
+        Err(_) => { log::error!("Mutex poisoned in get_daily_costs"); return vec![]; }
+    };
     let today = chrono::Local::now().date_naive();
     let entries: Vec<DailyCostEntry> = (0..days)
         .map(|i| {
@@ -266,6 +279,7 @@ pub fn get_daily_costs(days: u32) -> Vec<DailyCostEntry> {
                 date: key,
                 cost_usd: entry.map(|e| e.cost_microcents as f64 / 1_000_000.0).unwrap_or(0.0),
                 requests: entry.map(|e| e.requests).unwrap_or(0),
+                is_estimated: false,
             }
         })
         .collect();
@@ -298,6 +312,7 @@ pub fn get_daily_costs(days: u32) -> Vec<DailyCostEntry> {
                 date: date.format("%Y-%m-%d").to_string(),
                 cost_usd: if effective_days > 0.0 { monthly_cost / effective_days } else { 0.0 },
                 requests: 0,
+                is_estimated: true,
             });
         }
         result.reverse();
@@ -363,9 +378,7 @@ fn build_summary(store: &AiUsageStore, month: &str) -> UsageSummary {
 }
 
 fn is_valid_month(month: &str) -> bool {
-    month.len() == 7 && month.as_bytes()[4] == b'-'
-        && month[..4].parse::<u16>().is_ok()
-        && month[5..].parse::<u8>().map(|m| (1..=12).contains(&m)).unwrap_or(false)
+    chrono::NaiveDate::parse_from_str(&format!("{month}-01"), "%Y-%m-%d").is_ok()
 }
 
 fn get_pricing(model: &str) -> ModelPricing {

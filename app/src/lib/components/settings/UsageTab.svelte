@@ -16,7 +16,7 @@
     budget_limit_usd: number;
     budget_remaining_usd: number;
   };
-  type DailyCost = { date: string; cost_usd: number; requests: number };
+  type DailyCost = { date: string; cost_usd: number; requests: number; is_estimated: boolean };
   type FeatureCost = { feature: string; cost_usd: number; requests: number };
   type HistoryEntry = { timestamp: string; model: string; feature: string; input_tokens: number; output_tokens: number; cost_usd: number };
 
@@ -76,12 +76,19 @@
 
   async function onMonthChange() {
     if (!selectedMonth) return;
+    loading = true;
     try {
       aiUsage = await invoke<UsageSummary>('get_ai_usage_for_month', { month: selectedMonth });
       featureCosts = await invoke<FeatureCost[]>('get_ai_feature_costs', { month: selectedMonth });
     } catch (e: any) {
       error = e?.message ?? String(e);
+    } finally {
+      loading = false;
     }
+  }
+
+  async function onBudgetChange() {
+    await invoke('set_ai_budget', { limitUsd: settings.aiBudgetLimitUsd ?? 0 });
   }
 
   onMount(() => { fetchAll(); });
@@ -90,7 +97,7 @@
   let totalCost = $derived(aiUsage?.total_cost_usd ?? 0);
   let budgetLimit = $derived(aiUsage?.budget_limit_usd ?? 0);
 
-  let lineChartData = $derived(() => {
+  let lineChartData = $derived.by(() => {
     const c = getChartColors();
     return {
       labels: dailyCosts.map(d => d.date.slice(5)),
@@ -106,7 +113,7 @@
     };
   });
 
-  let lineChartOptions = $derived(() => {
+  let lineChartOptions = $derived.by(() => {
     const c = getChartColors();
     return {
       responsive: true,
@@ -119,7 +126,7 @@
     };
   });
 
-  let doughnutData = $derived(() => {
+  let doughnutData = $derived.by(() => {
     const c = getChartColors();
     const colors = [c.mauve, c.blue, c.green, c.yellow, c.red];
     return {
@@ -132,7 +139,7 @@
     };
   });
 
-  let doughnutOptions = $derived(() => {
+  let doughnutOptions = $derived.by(() => {
     const c = getChartColors();
     return {
       responsive: true,
@@ -147,7 +154,7 @@
 
 <h3>AI 利用状況</h3>
 <label class="fl">月額利用上限 (USD)
-  <input type="number" step="0.5" min="0" bind:value={settings.aiBudgetLimitUsd} placeholder="0 = 無制限" />
+  <input type="number" step="0.5" min="0" bind:value={settings.aiBudgetLimitUsd} onchange={onBudgetChange} placeholder="0 = 無制限" />
 </label>
 <div class="cm" style="margin-bottom:12px">{settings.aiBudgetLimitUsd > 0 ? `$${settings.aiBudgetLimitUsd} を超えるとAI機能が停止します` : '上限なし（無制限）'}</div>
 
@@ -186,9 +193,9 @@
 
     {#if dailyCosts.length > 0 && dailyCosts.some(d => d.cost_usd > 0)}
       <div class="card">
-        <div class="ch"><span aria-hidden="true">📈</span> 日次コスト推移（30日）</div>
+        <div class="ch"><span aria-hidden="true">📈</span> 日次コスト推移（30日）{#if dailyCosts.some(d => d.is_estimated)}<span class="estimated">※推定値</span>{/if}</div>
         <div class="chart-wrap">
-          <Line data={lineChartData()} options={lineChartOptions()} />
+          <Line data={lineChartData} options={lineChartOptions} />
         </div>
       </div>
     {/if}
@@ -197,7 +204,7 @@
       <div class="card">
         <div class="ch"><span aria-hidden="true">🧩</span> 機能別内訳</div>
         <div class="chart-wrap-sm">
-          <Doughnut data={doughnutData()} options={doughnutOptions()} />
+          <Doughnut data={doughnutData} options={doughnutOptions} />
         </div>
       </div>
     {/if}
@@ -250,6 +257,7 @@
   .error-msg { padding:6px 10px;border-radius:4px;background:var(--surface0);border:1px solid var(--red);color:var(--red);font-size:11px;margin-bottom:8px }
   .card { background:var(--mantle);border:1px solid var(--surface1);border-radius:6px;padding:12px;margin:8px 0 }
   .ch { font-size:12px;font-weight:700;margin-bottom:8px }
+  .estimated { font-weight:400;font-size:10px;color:var(--overlay);margin-left:4px }
   .row { display:flex;gap:6px }
   .btn-sm { padding:4px 12px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:11px;cursor:pointer }
   .btn-sm.gb { border-color:var(--green);color:var(--green) }
