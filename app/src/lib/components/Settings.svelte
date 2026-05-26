@@ -6,6 +6,7 @@
   import LlmTab from './settings/LlmTab.svelte';
   import UsageTab from './settings/UsageTab.svelte';
   import ShortcutTab from './settings/ShortcutTab.svelte';
+  import NotificationTab from './settings/NotificationTab.svelte';
 
   let { settings, onClose, onSave }: {
     settings: AppSettings;
@@ -21,6 +22,7 @@
 
   const globalTabs = [
     { id: 'account', label: 'メールアカウント' },
+    { id: 'notification', label: '通知' },
     { id: 'llm', label: 'LLMプロバイダー' },
     { id: 'ai_usage', label: 'AI 利用状況' },
     { id: 'shortcuts', label: 'キーボードショートカット' },
@@ -41,6 +43,8 @@
       <div class="content">
         {#if activeTab === 'account'}
           <AccountTab bind:settings={local} />
+        {:else if activeTab === 'notification'}
+          <NotificationTab bind:settings={local} />
         {:else if activeTab === 'llm'}
           <LlmTab bind:settings={local} />
         {:else if activeTab === 'ai_usage'}

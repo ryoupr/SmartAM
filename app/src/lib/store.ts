@@ -63,6 +63,7 @@ export interface AppSettings {
   timezone: string;
   logLevel: LogLevel;
   theme: 'dark' | 'light';
+  notificationSoundName: string;
 }
 
 export const DEFAULT_ACCOUNT_EXTRAS = {
@@ -92,6 +93,7 @@ export const DEFAULTS: AppSettings = {
   timezone: 'Asia/Tokyo',
   logLevel: 'info' as LogLevel,
   theme: 'light' as const,
+  notificationSoundName: 'default',
 };
 
 let _store: Awaited<ReturnType<typeof load>> | null = null;

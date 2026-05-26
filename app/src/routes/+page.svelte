@@ -122,6 +122,7 @@
         folders: a.notificationFolders ?? ['INBOX'],
         sync_interval_secs: (a.syncInterval ?? 5) * 60,
         notification_sound: a.notificationSound ?? true,
+        notification_sound_name: settings.notificationSoundName ?? 'default',
       } : null)
       .filter((c): c is NonNullable<typeof c> => c !== null);
     invoke('restart_idle_watcher', { configs }).catch(e => trace('IDLE', `restart failed: ${e}`));

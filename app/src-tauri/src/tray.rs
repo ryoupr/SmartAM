@@ -66,10 +66,14 @@ pub fn toggle_pause(app: &AppHandle) {
 }
 
 fn show_window(app: &AppHandle) {
+    log::debug!("tray: show_window called");
     if let Some(window) = app.get_webview_window("main") {
+        log::debug!("tray: found main window, showing");
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+    } else {
+        log::error!("tray: main window not found");
     }
 }
 

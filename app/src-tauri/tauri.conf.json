@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SmartAM",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "identifier": "com.smartam.app",
   "build": {
     "frontendDist": "../build",
@@ -28,7 +28,7 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "Apple Development: tr120710@gmail.com (2MP58DYN98)"
     },
     "icon": [
       "icons/32x32.png",

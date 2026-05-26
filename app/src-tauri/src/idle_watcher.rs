@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -43,6 +42,7 @@ pub struct WatcherAccountConfig {
     pub folders: Vec<String>,
     pub sync_interval_secs: u64,
     pub notification_sound: bool,
+    pub notification_sound_name: String,
 }
 
 // --- Global State ---
@@ -321,14 +321,24 @@ fn on_new_mail(
         format!("{}: {} 他{}件", latest.from, latest.subject, mails.len() - 1)
     };
 
-    if let Err(e) = app.notification()
-        .builder()
-        .title("SmartAM")
-        .body(&body)
-        .show()
-    {
-        log::error!("notification send failed: {}", e);
-    }
+    let sound = if cfg.notification_sound { cfg.notification_sound_name.clone() } else { String::new() };
+    std::thread::spawn(move || {
+        let _ = notify_rust::set_application("com.smartam.app");
+        let mut n = notify_rust::Notification::new();
+        n.summary("SmartAM").body(&body);
+        let _ = n.show();
+        // Play sound via afplay (NSUserNotification sound is broken on macOS 13+)
+        if !sound.is_empty() {
+            let path = if sound.starts_with('/') {
+                sound
+            } else if sound == "default" {
+                "/System/Library/Sounds/Tink.aiff".to_string()
+            } else {
+                format!("/System/Library/Sounds/{}.aiff", sound)
+            };
+            let _ = std::process::Command::new("afplay").arg(path).output();
+        }
+    });
 }
 
 // --- Internal: Helpers ---

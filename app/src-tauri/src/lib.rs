@@ -521,6 +521,49 @@ async fn set_notification_pause(paused: bool) {
     idle_watcher::set_paused(paused).await;
 }
 
+#[tauri::command]
+fn send_test_notification(sound: String) -> Result<(), String> {
+    send_macos_notification("SmartAM", "テスト通知です 🎉", &sound)
+}
+
+#[tauri::command]
+fn preview_sound(name: String) -> Result<(), String> {
+    let path = if name.starts_with('/') {
+        name // absolute path = custom file
+    } else {
+        format!("/System/Library/Sounds/{}.aiff", if name == "default" { "Tink" } else { &name })
+    };
+    std::process::Command::new("afplay")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| format!("再生失敗: {e}"))?;
+    Ok(())
+}
+
+fn send_macos_notification(title: &str, body: &str, sound: &str) -> Result<(), String> {
+    log::info!("send_macos_notification: title={} body={} sound={}", title, body, sound);
+    let _ = notify_rust::set_application("com.smartam.app");
+    let mut n = notify_rust::Notification::new();
+    n.summary(title).body(body);
+    // Don't rely on NSUserNotification sound (broken on macOS 13+), play via afplay
+    match n.show() {
+        Ok(_) => log::info!("notification sent OK"),
+        Err(e) => { log::error!("notification failed: {}", e); return Err(format!("通知送信失敗: {e}")); }
+    }
+    // Play sound separately
+    if !sound.is_empty() {
+        let path = if sound.starts_with('/') {
+            sound.to_string()
+        } else if sound == "default" {
+            "/System/Library/Sounds/Tink.aiff".to_string()
+        } else {
+            format!("/System/Library/Sounds/{}.aiff", sound)
+        };
+        std::process::Command::new("afplay").arg(path).spawn().ok();
+    }
+    Ok(())
+}
+
 use tauri::AppHandle;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -574,21 +617,32 @@ pub fn run() {
             get_calendar_event_status,
             check_calendar_conflicts,
             store_keychain, get_keychain, delete_keychain,
-            get_idle_status, restart_idle_watcher, set_notification_pause,
+            get_idle_status, restart_idle_watcher, set_notification_pause, send_test_notification, preview_sound,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             match event {
                 tauri::RunEvent::ExitRequested { api, .. } => {
-                    // Prevent exit when all windows are closed — keep running in background
                     api.prevent_exit();
                 }
-                tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::CloseRequested { api, .. }, .. } => {
-                    // Hide window instead of closing
-                    api.prevent_close();
+                tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::CloseRequested { api, .. }, label, .. } => {
+                    // Only hide (instead of close) in release builds
+                    if !tauri::is_dev() {
+                        log::debug!("CloseRequested: hiding window={}", label);
+                        api.prevent_close();
+                        if let Some(window) = app.get_webview_window(&label) {
+                            let _ = window.hide();
+                        }
+                    }
+                }
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => {
+                    // macOS: clicking Dock icon when no window visible
+                    log::debug!("Reopen event");
                     if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.hide();
+                        let _ = window.show();
+                        let _ = window.set_focus();
                     }
                 }
                 _ => {}
