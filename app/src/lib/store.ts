@@ -23,6 +23,7 @@ export interface Account {
   notifications: boolean;
   notificationSound: boolean;
   notificationBadge: boolean;
+  notificationFolders: string[];
   syncInterval: number;
   calendar: CalendarSettings;
 }
@@ -68,6 +69,7 @@ export const DEFAULT_ACCOUNT_EXTRAS = {
   notifications: true,
   notificationSound: true,
   notificationBadge: false,
+  notificationFolders: ['INBOX'],
   syncInterval: 5,
   calendar: { provider: 'google' as const, calendarName: '', googleConnected: false },
 };

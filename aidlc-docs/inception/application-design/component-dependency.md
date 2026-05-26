@@ -1,79 +1,55 @@
-# Component Dependencies
+# Component Dependencies — Iteration 4
 
-## Dependency Diagram
+## 依存関係図
 
 ```mermaid
 graph TD
-    subgraph Frontend
-        Page["+page.svelte<br/>(thin orchestrator)"]
-        SM[stores/mail.ts]
-        SS[stores/settings.ts]
-        SA[stores/ai.ts]
-        SU[stores/ui.ts]
-        Sidebar[Sidebar]
-        ML[MailList]
-        MD[MailDetail]
-        Settings[Settings tabs]
-        Compose[ComposeModal]
-        Shortcuts[ShortcutManager]
+    subgraph Rust["Rust Backend"]
+        Lib[lib.rs<br/>setup + commands]
+        IW[idle_watcher.rs<br/>IDLE + Polling]
+        Tray[tray.rs<br/>Tray Menu]
+        IMAP[imap_client.rs<br/>IMAP接続]
+        Notif[tauri_plugin_notification]
     end
 
-    subgraph Backend
-        Lib[lib.rs<br/>(commands)]
-        IMAP[imap_client]
-        SMTP[smtp_client]
-        AI[ai_client]
-        Usage[ai_usage]
-        OAuth[oauth]
-        Cal[calendar]
-        KC[keychain]
-        Err[error types]
+    subgraph Frontend["Frontend"]
+        Page[+page.svelte]
+        AccTab[AccountTab.svelte]
+        Store[store.ts]
     end
 
-    Page --> SM & SS & SA & SU
-    Page --> Sidebar & ML & MD & Settings & Compose & Shortcuts
-    ML --> SM
-    MD --> SA
-    Settings --> SS
-    Compose --> SM
-
-    SM -->|invoke| Lib
-    SS -->|invoke| Lib
-    SA -->|invoke| Lib
-
-    Lib --> IMAP & SMTP & AI & OAuth & Cal
-    AI --> Usage
-    OAuth --> KC
-    Lib --> KC
-    IMAP --> Err
-    AI --> Err
-    OAuth --> Err
-    Cal --> Err
+    Lib -->|spawn| IW
+    Lib -->|setup| Tray
+    IW -->|接続再利用| IMAP
+    IW -->|通知送信| Notif
+    IW -->|emit new-mail| Page
+    IW -->|badge更新| Tray
+    Tray -->|show/hide| Page
+    Page -->|listen events| IW
+    Page -->|invoke commands| Lib
+    AccTab -->|設定保存| Store
+    Store -->|restart_idle_watcher| Lib
 ```
 
-## Communication Patterns
+## 依存マトリクス
 
-| From | To | Pattern | Data |
-|------|----|---------|------|
-| Component | Store | Function call | Action params |
-| Store | Backend | `invoke()` IPC | JSON serialized |
-| Backend → Frontend | Return | Result<T, FrontendError> | JSON |
-| Backend modules | error.rs | `?` operator + From impl | Error conversion |
-| keychain.rs | macOS Keychain | `security` CLI or `security-framework` crate | Credential CRUD |
+| コンポーネント | 依存先 | 通信方式 |
+|---|---|---|
+| IdleWatcher | imap_client.rs | 関数呼び出し（接続確立） |
+| IdleWatcher | tauri_plugin_notification | API呼び出し（通知送信） |
+| IdleWatcher | AppHandle | `app.emit()` でFEにイベント送信 |
+| IdleWatcher | TrayManager | バッジ件数更新 |
+| TrayManager | AppHandle | ウィンドウ表示/非表示制御 |
+| lib.rs | IdleWatcher | setup時にspawn |
+| lib.rs | TrayManager | setup時に初期化 |
+| +page.svelte | IdleWatcher | イベントリスナー（`new-mail`） |
+| +page.svelte | lib.rs | コマンド呼び出し（`get_idle_status`） |
+| AccountTab | store.ts | 設定保存→ `restart_idle_watcher` トリガー |
 
-## Data Flow (Refactored)
+## データフロー
 
 ```
-User Action → Component → Store Action → invoke() → Rust Command → Module → External Service
-                                                          ↓
-                                              Result<T, FrontendError>
-                                                          ↓
-                                              Store State Update → Reactive UI Update
+[IMAP Server] → IDLE通知 → [IdleWatcher] → macOS通知 (plugin)
+                                          → emit("new-mail") → [+page.svelte] → UI更新
+                                          → TrayManager → バッジ更新
 ```
-
-## Key Design Decisions
-
-1. **invoke()はstore内に閉じ込める** — コンポーネントから直接invokeしない
-2. **エラーはFrontendError型で統一** — フロントエンドは`code`フィールドでハンドリング分岐
-3. **認証情報はKeychain経由** — settings.jsonには認証情報を保存しない
-4. **+page.svelteはthin orchestrator** — ロジックはstore、UIはコンポーネントに委譲

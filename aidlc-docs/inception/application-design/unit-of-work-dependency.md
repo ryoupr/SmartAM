@@ -1,46 +1,32 @@
-# Unit of Work — Dependency Matrix
+# Unit of Work Dependencies — Iteration 4
 
-## Dependency Diagram
+## 依存マトリクス
+
+| Unit | 依存先 | 依存種別 |
+|---|---|---|
+| Unit 1 (IdleWatcher) | imap_client.rs | ビルド時（関数呼び出し） |
+| Unit 1 (IdleWatcher) | tauri_plugin_notification | ビルド時（crate依存） |
+| Unit 2 (TrayManager) | Unit 1 (IdleWatcher) | ランタイム（バッジ件数取得） |
+| Unit 3 (Frontend) | Unit 1 (IdleWatcher) | ランタイム（イベント受信） |
+| Unit 3 (Frontend) | Unit 2 (TrayManager) | なし（独立） |
+
+## 実行順序の根拠
 
 ```mermaid
 graph LR
-    U1[Unit 1<br/>バグ修正]
-    U2[Unit 2<br/>FE リファクタ]
-    U3[Unit 3<br/>BE リファクタ]
-    U4[Unit 4<br/>Keychain]
-    U5[Unit 5<br/>パフォーマンス]
-    U6[Unit 6<br/>テスト+CI]
-
-    U3 --> U4
-    U2 --> U5
-    U3 --> U5
-    U2 --> U6
-    U3 --> U6
-
-    style U1 fill:#f38ba8,stroke:#1e1e2e,color:#1e1e2e
-    style U2 fill:#89b4fa,stroke:#1e1e2e,color:#1e1e2e
-    style U3 fill:#89b4fa,stroke:#1e1e2e,color:#1e1e2e
-    style U4 fill:#f9e2af,stroke:#1e1e2e,color:#1e1e2e
-    style U5 fill:#f9e2af,stroke:#1e1e2e,color:#1e1e2e
-    style U6 fill:#f9e2af,stroke:#1e1e2e,color:#1e1e2e
+    U1[Unit 1: IdleWatcher] --> U2[Unit 2: TrayManager]
+    U1 --> U3[Unit 3: Frontend統合]
+    U2 -.->|独立| U3
 ```
 
-## Execution Order
+- Unit 1 が先: イベント発火元がないとUnit 2, 3のテストができない
+- Unit 2 は Unit 1 完了後: バッジ更新にIdleWatcherの件数が必要
+- Unit 3 は最後: Unit 1, 2が動作する前提でFE側を接続
 
-```
-Phase A (先行リリース):  Unit 1 → リリース v0.2.13
-Phase B (並行):          Unit 2 + Unit 3 (同時着手可能)
-Phase C (依存解決後):    Unit 4 + Unit 5 + Unit 6 (Unit 2,3完了後)
-Final Release:           v0.3.0
-```
+## 共有リソース
 
-## Dependency Matrix
-
-| Unit | Depends On | Blocks | Can Parallel With |
-|------|-----------|--------|-------------------|
-| 1 | なし | なし | 2, 3 |
-| 2 | なし | 5, 6 | 1, 3 |
-| 3 | なし | 4, 5, 6 | 1, 2 |
-| 4 | 3 | なし | 5, 6 |
-| 5 | 2, 3 | なし | 4, 6 |
-| 6 | 2, 3 | なし | 4, 5 |
+| リソース | 使用ユニット | 競合リスク |
+|---|---|---|
+| AppHandle | 全ユニット | なし（Clone可能） |
+| IMAP接続プール | Unit 1 + 既存imap_client | 低（IDLE用は別接続） |
+| store.json（設定） | Unit 3 → Unit 1 | なし（設定変更→restart で同期） |

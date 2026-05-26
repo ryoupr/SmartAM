@@ -576,3 +576,41 @@ pub async fn fetch_attachment_bytes(config: &AccountConfig, folder: &str, uid: u
     if result.is_ok() { return_session(key, session).await; }
     result
 }
+
+// --- Public API for IdleWatcher (separate from pooled sessions) ---
+
+/// Create a new IMAP session for IDLE use (not pooled).
+pub async fn connect_idle_session(config: &AccountConfig) -> Result<AsyncImapSession, String> {
+    connect_async(config).await
+}
+
+/// Fetch new mails using an existing session (for IDLE watcher).
+pub async fn fetch_new_mails_with_session(
+    session: &mut AsyncImapSession,
+    _folder: &str,
+    since_uid: u32,
+) -> Result<Vec<MailSummary>, String> {
+    let range = format!("{}:*", since_uid + 1);
+    let messages: Vec<_> = session.uid_fetch(&range, "(UID FLAGS ENVELOPE)").await
+        .map_err(|e| format!("差分取得失敗: {e}"))?
+        .try_collect().await
+        .map_err(|e| format!("差分取得失敗: {e}"))?;
+    let mut results = Vec::new();
+    for msg in &messages {
+        let uid = msg.uid.unwrap_or(0);
+        if uid <= since_uid { continue; }
+        let seen = msg.flags().any(|f| matches!(f, async_imap::types::Flag::Seen));
+        let envelope = match msg.envelope() { Some(e) => e, None => continue };
+        let from = envelope.from.as_ref().and_then(|a| a.first()).map(|a| extract_name_or_email(a)).unwrap_or_default();
+        let subject = envelope.subject.as_ref().map(|s| decode_rfc2047(s)).unwrap_or_default();
+        let date = envelope.date.as_ref().map(|d| String::from_utf8_lossy(d).to_string()).unwrap_or_default();
+        results.push(MailSummary { uid, from, subject, date, seen });
+    }
+    results.reverse();
+    Ok(results)
+}
+
+/// Public wrapper for resolve_folder (used by idle_watcher).
+pub fn resolve_folder_pub(email: &str, folder: &str) -> String {
+    resolve_folder(email, folder)
+}

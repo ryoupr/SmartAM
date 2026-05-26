@@ -1,64 +1,38 @@
-# Components
+# Components — Iteration 4
 
-## Frontend Components
+## 新規コンポーネント
 
-### Design System (v0.4.0 リブランド)
-| Component | Purpose | Props |
-|-----------|---------|-------|
-| `Button.svelte` | 汎用ボタン（線アイコン + ラベル + kbd） | label, icon, kbd, variant, active, disabled, title, onclick |
-| `Icon.svelte` | SVG線アイコン（12種 + 翻訳テキスト） | name, size |
+### 1. IdleWatcher (`idle_watcher.rs`)
+**責務**: IMAP IDLE接続の維持・新着検知・フォールバックポーリング
+- アカウントごとにIDLE接続を管理
+- 新着検知時にTauriイベントを発火
+- 接続断時の自動再接続 + ポーリングフォールバック
+- RFC 2177準拠（29分ごとIDLE再発行）
 
-**Button バリアント**: primary, danger, starred, ai-summary, ai-draft, ai-translate, ai-calendar, ai-regen, ghost
+### 2. TrayManager (`tray.rs`)
+**責務**: メニューバーアイコンとメニューの管理
+- Trayアイコン表示
+- メニュー項目の動的更新（新着件数）
+- 通知一時停止状態の管理
+- ウィンドウ表示/非表示の制御
 
-**Icon 名**: reply, forward, archive, trash, star, summary, draft, translate, calendar, regen, send, attach
+### 3. NotificationFolderSettings (Frontend: 設定UI拡張)
+**責務**: 通知対象フォルダの選択UI
+- AccountTab.svelte内の通知設定セクションに追加
+- フォルダ一覧取得 + チェックボックス選択
 
-### Core Layout
-| Component | Purpose | 備考 |
-|-----------|---------|------|
-| `Sidebar.svelte` | サイドバー（智マーク + ワードマーク、フォルダ、LLM badge） | 絵文字廃止済み |
-| `MailList.svelte` | メール一覧（仮想スクロール、380px幅） | ヘッダー: タイトル+カウント+更新ボタン |
-| `MailDetail.svelte` | メール詳細 + ツールバー（Button.svelte使用） | Auto-collapse対応（≤600px → icon-only） |
-| `AiPanel.svelte` | AI機能パネル（要約・下書き・翻訳） | Icon.svelte使用 |
-| `CalendarPanel.svelte` | カレンダーイベント検出・登録 | |
-| `ComposeModal.svelte` | メール作成（Icon.svelte使用） | |
-| `EventCard.svelte` | ICSイベント表示・承諾/辞退 | |
+## 既存コンポーネント変更
 
-### Utility
-| Component | Purpose |
-|-----------|---------|
-| `ToastNotification.svelte` | トースト通知（ink背景、slide-in、左border色） |
-| `ShortcutManager.svelte` | キーボードショートカット制御 |
-| `UpdateBanner.svelte` | アプリ更新通知バナー |
-| `ConfirmDeleteDialog.svelte` | 削除確認ダイアログ |
-| `Settings.svelte` | 設定モーダル（智マーク、動的バージョン表示） |
+### 4. lib.rs (変更)
+- `RunEvent::ExitRequested` で `prevent_exit()` 追加
+- IdleWatcher起動をsetup内に追加
+- TrayManager初期化を追加
+- 新規Tauriコマンド追加
 
-### Settings Tabs
-| Component | Purpose |
-|-----------|---------|
-| `settings/AccountTab.svelte` | メールアカウント管理 |
-| `settings/LlmTab.svelte` | LLMプロバイダー設定 |
-| `settings/UsageTab.svelte` | AI利用状況・コスト |
-| `settings/ShortcutTab.svelte` | ショートカットカスタマイズ |
+### 5. store.ts / AccountTab.svelte (変更)
+- アカウント設定に `notificationFolders: string[]` 追加
+- 通知対象フォルダ選択UIの追加
 
-### State Management
-| Module | Purpose |
-|--------|---------|
-| `stores/mail.ts` | メール状態（一覧・選択・フォルダ） |
-| `stores/settings.ts` | アプリ設定（loadSettings/saveSettings ラッパー） |
-| `stores/ui.ts` | UI状態（トースト・モーダル） |
-
----
-
-## Backend Components (Rust)
-
-### Core
-| Module | Purpose |
-|--------|---------|
-| `lib.rs` | Tauriコマンド定義 |
-| `imap_client.rs` | async-imap（接続プール・キャッシュ・全IMAP操作） |
-| `smtp_client.rs` | SMTP送信 |
-| `ai_client.rs` | LLM統合（OpenAI互換 + Bedrock Converse） |
-| `ai_usage.rs` | トークン使用量追跡・コスト計算 |
-| `oauth.rs` | Google OAuth 2.0 |
-| `calendar.rs` | カレンダーイベント検出・登録 |
-| `ics_parser.rs` | ICSファイルパース |
+### 6. +page.svelte (変更)
+- フロントエンド側ポーリング削除（Rust側に移行）
+- Tauriイベントリスナー追加（新着通知受信）

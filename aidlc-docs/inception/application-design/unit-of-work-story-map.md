@@ -1,20 +1,17 @@
-# Unit of Work — Requirements Mapping
+# Unit of Work — Requirements Map (Iteration 4)
 
-## Functional Requirements → Units
+User Storiesスキップのため、要件(FR/NFR)とユニットのマッピングを記載。
 
-| Requirement | Unit |
-|-------------|------|
-| FR-1: HTMLメール内リンク外部ブラウザ起動 | Unit 1 |
-| FR-2: God Component分割 | Unit 2 |
-| FR-3: 構造化エラーハンドリング | Unit 3 |
-| FR-4: Dead Code除去 | Unit 3 |
+## マッピング
 
-## Non-Functional Requirements → Units
-
-| Requirement | Unit |
-|-------------|------|
-| NFR-1: テストカバレッジ80%+ | Unit 6 |
-| NFR-2: CI/CD | Unit 6 |
-| NFR-3: セキュリティ（Keychain） | Unit 4 |
-| NFR-4: パフォーマンス（仮想スクロール + async-imap） | Unit 5 |
-| NFR-5: コード品質（lint, doc） | Unit 6 |
+| 要件 | Unit 1 | Unit 2 | Unit 3 |
+|---|---|---|---|
+| FR-1: IMAP IDLEリアルタイム検知 | ✅ 主担当 | | |
+| FR-2: フォールバックポーリング | ✅ 主担当 | | |
+| FR-3: バックグラウンド常駐 | | ✅ 主担当 | |
+| FR-4: 通知表示 | ✅ 通知送信 | ✅ バッジ | |
+| FR-5: アカウント別通知設定 | ✅ 設定読込 | | ✅ 設定UI |
+| NFR-1: 信頼性 | ✅ 再接続+FB | | |
+| NFR-2: リソース効率 | ✅ 接続管理 | | |
+| NFR-3: セキュリティ | ✅ OAuth | | |
+| NFR-4: ロギング | ✅ 主担当 | ✅ 状態ログ | |

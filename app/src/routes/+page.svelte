@@ -106,7 +106,26 @@
     } catch (e) { error = String(e); } finally { loadingMore = false; }
   }
 
-  function startPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = setInterval(fetchNewMails, (acc()?.syncInterval ?? 5) * 60 * 1000); }
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    // Legacy polling as supplement — IdleWatcher handles primary notification
+    pollTimer = setInterval(fetchNewMails, (acc()?.syncInterval ?? 5) * 60 * 1000);
+    // Start Rust-side IdleWatcher
+    restartIdleWatcher();
+  }
+
+  function restartIdleWatcher() {
+    const configs = settings.accounts
+      .map((a, i) => a.notifications ? {
+        account: { email: a.email, auth_type: a.auth_type, password: a.password, access_token: a.access_token, imap_host: a.imap_host, imap_port: a.imap_port },
+        account_index: i,
+        folders: a.notificationFolders ?? ['INBOX'],
+        sync_interval_secs: (a.syncInterval ?? 5) * 60,
+        notification_sound: a.notificationSound ?? true,
+      } : null)
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+    invoke('restart_idle_watcher', { configs }).catch(e => trace('IDLE', `restart failed: ${e}`));
+  }
 
   function fetchCalendarNames() {
     const a = acc();
@@ -229,6 +248,18 @@
     invoke('set_log_level', { level: settings.logLevel ?? 'info' }).catch(() => {});
     if (acc()) { await fetchMails(); startPolling(); prefetchAllFolders(settings, folderCache, ps, trace); fetchCalendarNames(); }
     try { const { isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification'); if (!await isPermissionGranted()) await requestPermission(); } catch {}
+    // Listen for new-mail events from IdleWatcher (Rust backend)
+    try {
+      const { listen } = await import('@tauri-apps/api/event');
+      await listen<{ account_index: number; mails: typeof mails }>('new-mail', (event) => {
+        if (event.payload.account_index === settings.activeAccountIndex) {
+          const newMails = event.payload.mails;
+          mails = [...newMails, ...mails];
+          syncStatus = `${newMails.length}件の新着`;
+          setTimeout(() => { syncStatus = ''; }, 3000);
+        }
+      });
+    } catch (e) { trace('MOUNT', `event listen failed: ${e}`); }
     document.addEventListener('click', handleLinkClick);
     trace('MOUNT', 'done');
   });

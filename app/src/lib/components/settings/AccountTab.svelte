@@ -211,6 +211,16 @@
       <label class="cb"><input type="checkbox" bind:checked={acc.notifications} /> 新着メール通知</label>
       <label class="cb"><input type="checkbox" bind:checked={acc.notificationSound} /> サウンド</label>
       <label class="cb"><input type="checkbox" bind:checked={acc.notificationBadge} /> バッジ表示（Dock）</label>
+      <fieldset class="folder-select">
+        <legend>通知対象フォルダ</legend>
+        {#each ['INBOX', 'STARRED', 'SENT', 'ALL'] as folder}
+          <label class="cb"><input type="checkbox" checked={acc.notificationFolders?.includes(folder)} onchange={(e) => {
+            const checked = (e.target as HTMLInputElement).checked;
+            const folders = acc.notificationFolders ?? ['INBOX'];
+            acc.notificationFolders = checked ? [...folders, folder] : folders.filter(f => f !== folder);
+          }} /> {folder}</label>
+        {/each}
+      </fieldset>
       <label class="fl">同期間隔
         <select bind:value={acc.syncInterval}>
           <option value={1}>1分</option><option value={5}>5分</option><option value={15}>15分</option><option value={30}>30分</option>

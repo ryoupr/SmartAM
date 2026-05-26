@@ -1,80 +1,68 @@
-# Component Methods
+# Component Methods — Iteration 4
 
-## Frontend Store Modules
+## IdleWatcher (`idle_watcher.rs`)
 
-### stores/mail.ts
-```typescript
-// State
-mailList: MailSummary[]
-selectedMail: MailDetail | null
-activeFolder: string
-loading: boolean
-hasMore: boolean
-
-// Actions
-fetchMails(folder: string): Promise<void>
-loadMore(): Promise<void>
-selectMail(uid: number): Promise<void>
-archiveMail(uid: number): Promise<void>
-deleteMail(uid: number): Promise<void>
-starMail(uid: number, add: boolean): Promise<void>
-searchMails(query: string): Promise<void>
-```
-
-### stores/settings.ts
-```typescript
-// State
-settings: AppSettings
-// Actions
-load(): Promise<void>
-save(): Promise<void>
-getActiveAccount(): Account | null
-getLlmConfig(): LlmConfig
-```
-
-### stores/ui.ts
-```typescript
-// State
-toast: ToastMessage | null
-composeMode: 'new' | 'reply' | 'forward' | null
-showSettings: boolean
-// Actions
-showToast(msg: string, undo?: () => void): void
-dismissToast(): void
-```
-
----
-
-## Backend Modules
-
-### error.rs
 ```rust
-// Frontend-serializable error
-#[derive(Serialize)]
-pub struct FrontendError {
-    pub code: String,      // e.g. "IMAP_CONNECTION_FAILED"
-    pub message: String,   // Human-readable
-    pub retryable: bool,
-}
+/// IDLEウォッチャーを起動（全アカウント分）
+pub fn start(app_handle: AppHandle, accounts: Vec<AccountConfig>, folders: Vec<Vec<String>>)
 
-impl From<ImapError> for FrontendError { ... }
-impl From<AiError> for FrontendError { ... }
-impl From<AuthError> for FrontendError { ... }
-impl From<CalendarError> for FrontendError { ... }
+/// 特定アカウントのIDLE監視を停止
+pub fn stop_account(account_index: usize)
+
+/// 全アカウントのIDLE監視を停止
+pub fn stop_all()
+
+/// 現在の接続状態を取得
+pub fn get_status() -> Vec<WatcherStatus>
+
+/// 設定変更時にウォッチャーを再起動
+pub fn reload(accounts: Vec<AccountConfig>, folders: Vec<Vec<String>>)
 ```
 
-### keychain.rs
+### 内部メソッド
 ```rust
-pub fn store_credential(service: &str, account: &str, secret: &str) -> Result<(), AuthError>
-pub fn get_credential(service: &str, account: &str) -> Result<String, AuthError>
-pub fn delete_credential(service: &str, account: &str) -> Result<(), AuthError>
+/// 単一アカウント・フォルダのIDLEループ
+async fn idle_loop(app: AppHandle, config: AccountConfig, folder: String, index: usize)
+
+/// IDLE接続確立
+async fn connect_idle(config: &AccountConfig, folder: &str) -> Result<ImapSession>
+
+/// フォールバックポーリング
+async fn poll_fallback(app: AppHandle, config: AccountConfig, folder: String, interval: Duration)
+
+/// 新着検知時の処理（通知発火 + イベント送信）
+fn on_new_mail(app: &AppHandle, account_index: usize, mails: Vec<MailSummary>)
 ```
 
-### imap_client.rs (async-imap移行後)
+## TrayManager (`tray.rs`)
+
 ```rust
-pub async fn fetch_mails(config: &AccountConfig, folder: &str, offset: u32, limit: u32) -> Result<(Vec<MailSummary>, u32), ImapError>
-pub async fn fetch_mail_detail(config: &AccountConfig, folder: &str, uid: u32) -> Result<MailDetail, ImapError>
-pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, limit: u32) -> Result<Vec<MailSummary>, ImapError>
-pub async fn archive_mail(config: &AccountConfig, folder: &str, uid: u32) -> Result<(), ImapError>
-// ... (既存APIシグネチャ維持、戻り値型のみ変更)
+/// Trayアイコンとメニューを初期化
+pub fn setup(app: &App) -> Result<()>
+
+/// メニューの新着件数を更新
+pub fn update_badge(app: &AppHandle, count: usize)
+
+/// 通知一時停止の切替
+pub fn toggle_pause(app: &AppHandle) -> bool
 ```
+
+## 新規Tauriコマンド (`lib.rs`)
+
+```rust
+#[tauri::command]
+fn get_idle_status() -> Vec<WatcherStatus>
+
+#[tauri::command]
+fn restart_idle_watcher(accounts: Vec<AccountConfig>, folders: Vec<Vec<String>>)
+
+#[tauri::command]
+fn set_notification_pause(paused: bool)
+```
+
+## Tauriイベント（Rust → Frontend）
+
+| イベント名 | ペイロード | 発火タイミング |
+|---|---|---|
+| `new-mail` | `{ accountIndex, mails: MailSummary[] }` | 新着メール検知時 |
+| `idle-status-changed` | `{ accountIndex, status: "connected" \| "reconnecting" \| "polling" }` | 接続状態変化時 |

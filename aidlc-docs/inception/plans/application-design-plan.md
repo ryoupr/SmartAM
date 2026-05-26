@@ -1,60 +1,22 @@
-# Application Design Plan
+# Application Design Plan — Iteration 4
 
-## Plan Checklist
+## Plan Steps
+- [ ] コンポーネント定義（components.md）
+- [ ] コンポーネントメソッド定義（component-methods.md）
+- [ ] サービス定義（services.md）
+- [ ] コンポーネント依存関係（component-dependency.md）
+- [ ] 統合ドキュメント（application-design.md）
 
-- [ ] コンポーネント分割設計（Frontend）
-- [ ] コンポーネント分割設計（Backend）
-- [ ] サービスレイヤー設計
-- [ ] コンポーネント依存関係定義
-- [ ] 設計整合性検証
+## Design Questions (Answered)
 
----
+### Question 1
+新規バックグラウンドサービス（IDLE監視）の配置場所は？
+[Answer]: B — 新規 `idle_watcher.rs` モジュールとして分離（責務分離）
 
-## Design Questions
+### Question 2
+フロントエンドからバックグラウンドサービスの状態を確認する手段は？
+[Answer]: C — 両方（状態変化はイベント、詳細取得はコマンド）
 
-### Q1: Frontend状態管理パターン
-
-+page.svelteから状態管理を分離する方式：
-
-A) Svelte 5 runes + context API（コンポーネントツリーで共有）
-B) 専用のstate store module（store.tsを拡張してドメイン別に分割）
-C) 両方組み合わせ（グローバル状態はstore、ローカル状態はcontext）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: ---
-
-### Q2: Rustエラー型の粒度
-
-A) 1つの統合エラーenum（`AppError`に全バリアント）
-B) モジュール別エラーenum（`ImapError`, `AiError`, `CalendarError`等）+ `thiserror`
-C) B + フロントエンド向けのシリアライズ可能エラー型を別途定義
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: ---
-
-### Q3: Keychain統合の範囲
-
-A) APIキーのみ（LLMプロバイダーのapi_key）
-B) APIキー + OAuthトークン（access_token, refresh_token）
-C) 全認証情報（APIキー + OAuthトークン + IMAPパスワード）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: ---
-
-### Q4: 非同期IMAP実装方式
-
-A) `async-imap` crateに移行（tokioネイティブ）
-B) 現行`imap` crateを維持し`spawn_blocking`で包む（現状の改善版）
-C) `imap-next` crate（新しい非同期IMAP実装）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: ---
-
-### Q5: テストフレームワーク選定（Frontend）
-
-A) Vitest + @testing-library/svelte（コンポーネントテスト）
-B) Vitest + Playwright（E2Eのみ、コンポーネントテストなし）
-C) Vitest + @testing-library/svelte + Playwright（両方）
-X) Other (please describe after [Answer]: tag below)
-
-[Answer]: ---
+### Question 3
+メニューバー（Tray）アイコンのメニュー項目は？
+[Answer]: B — 標準: 「ウィンドウを表示」「新着N件」「通知一時停止」「終了」

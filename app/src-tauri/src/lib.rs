@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+use tauri::Manager;
 
 static RE_REGION: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"^[a-z0-9-]+$").unwrap());
 
@@ -8,10 +9,12 @@ mod ai_usage;
 mod calendar;
 mod error;
 mod ics_parser;
+mod idle_watcher;
 mod imap_client;
 mod keychain;
 mod oauth;
 mod smtp_client;
+mod tray;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AccountConfig {
@@ -499,6 +502,27 @@ fn delete_keychain(account: String, key_type: String) -> Result<(), String> {
     keychain::delete_credential(&account, &key_type)
 }
 
+// --- IdleWatcher commands ---
+
+#[tauri::command]
+async fn get_idle_status() -> Vec<idle_watcher::WatcherStatus> {
+    idle_watcher::get_status().await
+}
+
+#[tauri::command]
+async fn restart_idle_watcher(app: AppHandle, configs: Vec<idle_watcher::WatcherAccountConfig>) {
+    log::debug!("restart_idle_watcher: {} accounts", configs.len());
+    idle_watcher::reload(app, configs).await;
+}
+
+#[tauri::command]
+async fn set_notification_pause(paused: bool) {
+    log::debug!("set_notification_pause: {}", paused);
+    idle_watcher::set_paused(paused).await;
+}
+
+use tauri::AppHandle;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     log::info!("=== SmartAM starting ===");
@@ -523,6 +547,9 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             log::debug!("setup: updater plugin ok");
             log::debug!("setup: complete");
+            // Tray icon setup
+            tray::setup(app)?;
+            log::debug!("setup: tray ok");
             // Fetch Bedrock pricing in background
             tauri::async_runtime::spawn(ai_usage::fetch_pricing());
             Ok(())
@@ -547,9 +574,26 @@ pub fn run() {
             get_calendar_event_status,
             check_calendar_conflicts,
             store_keychain, get_keychain, delete_keychain,
+            get_idle_status, restart_idle_watcher, set_notification_pause,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            match event {
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    // Prevent exit when all windows are closed — keep running in background
+                    api.prevent_exit();
+                }
+                tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::CloseRequested { api, .. }, .. } => {
+                    // Hide window instead of closing
+                    api.prevent_close();
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                }
+                _ => {}
+            }
+        });
 
     log::info!("=== SmartAM exited ===");
 }

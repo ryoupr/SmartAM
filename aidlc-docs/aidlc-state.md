@@ -75,3 +75,20 @@
 ### Process Deviations
 - AI-DLC ワークフロー未遵守: Inception Phase を明示的に開始せず直接修正に入った。aidlc-state.md / audit.md の事前更新を怠った。事後に整合性を修復。
 - question-format-guide: 質問をチャット内で直接実施（ファイル未作成）。理由: バグ報告に対する即時対応。
+
+## Iteration 4: 新規メール受信通知（IMAP IDLE + バックグラウンド常駐）
+**Start Date**: 2026-05-26T15:02:54+09:00
+**Scope**: IMAP IDLEリアルタイム通知 + フォールバックポーリング + メニューバー常駐
+**Depth**: Standard（複数コンポーネント改修）
+
+### Stage Progress
+- [x] Requirements Analysis — 完了 2026-05-26T15:11:19+09:00
+- [ ] User Stories — SKIP（内部機能改善）
+- [x] Workflow Planning — 完了 2026-05-26T15:18:34+09:00
+- [x] Application Design — 完了 2026-05-26T15:25:55+09:00
+- [x] Units Generation — 完了 2026-05-26T15:29:29+09:00
+- [x] Functional Design (Unit 1: IdleWatcher) — 完了 2026-05-26T15:56:09+09:00
+- [x] Code Generation (Unit 1: IdleWatcher) — 完了 2026-05-26T16:00:22+09:00
+- [x] Code Generation (Unit 2: TrayManager) — 完了 2026-05-26T16:06:16+09:00
+- [x] Code Generation (Unit 3: Frontend統合) — 完了 2026-05-26T16:08:59+09:00
+- [x] Build and Test — 完了 2026-05-26T16:11:09+09:00

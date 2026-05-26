@@ -213,3 +213,93 @@ MailList.svelte L37-43 の `$effect` が `scrollTop` を暗黙的依存として
 - ⚠️ AI-DLC ワークフロー未遵守: セッション開始時に AI-DLC を起動したが、バグ報告受領後にワークフローを経由せず直接修正に入った。事後に aidlc-state.md / audit.md を修復。
 
 ---
+
+---
+
+## Iteration 4: 新規メール受信通知機能
+**Timestamp**: 2026-05-26T14:28:53+09:00
+**User Input**: "新規メール受信時に、通知する機能を実装したい。 対応OSはMacのみなので、そちらで通知が表示されればOK"
+**AI Response**: 新イテレーション開始。Requirements Analysis (Minimal) を実施。
+**Context**: INCEPTION - Requirements Analysis 開始
+
+---
+
+## Iteration 4: Requirements Analysis — 回答受領
+**Timestamp**: 2026-05-26T15:11:19+09:00
+**User Input**: "回答しました" — Q1:A(+補足:設定で対象フォルダ追加可能), Q2:A, Q3:B(デフォルトON), Q4:C, Q5:A, Q6:A
+**AI Response**: 矛盾なし。要件ドキュメント生成完了。
+**Context**: INCEPTION - Requirements Analysis 完了
+
+---
+
+## Iteration 4: Requirements Analysis — Approved
+**Timestamp**: 2026-05-26T15:18:34+09:00
+**User Input**: "✅ Approve & Continue - Approve requirements and proceed to Workflow Planning"
+**AI Response**: Requirements approved. Proceeding to Workflow Planning.
+**Context**: INCEPTION - Requirements Analysis → Workflow Planning
+
+---
+
+## Iteration 4: Workflow Planning — Approved
+**Timestamp**: 2026-05-26T15:21:02+09:00
+**User Input**: "✅ Approve & Continue - Approve plan and proceed to Application Design"
+**AI Response**: Plan approved. Proceeding to Application Design.
+**Context**: INCEPTION - Workflow Planning → Application Design
+
+---
+
+## Iteration 4: Application Design — Approved
+**Timestamp**: 2026-05-26T15:29:29+09:00
+**User Input**: "✅ Approve & Continue - Approve design and proceed to Units Generation"
+**AI Response**: Design approved. Proceeding to Units Generation.
+**Context**: INCEPTION - Application Design → Units Generation
+
+---
+
+## Iteration 4: Units Generation — Approved
+**Timestamp**: 2026-05-26T15:31:30+09:00
+**User Input**: "✅ Approve & Continue - Approve units and proceed to CONSTRUCTION PHASE (Functional Design"
+**AI Response**: Units approved. Proceeding to CONSTRUCTION PHASE - Functional Design (Unit 1: IdleWatcher).
+**Context**: INCEPTION complete → CONSTRUCTION - Functional Design
+
+---
+
+## Iteration 4: Functional Design (Unit 1) — Approved
+**Timestamp**: 2026-05-26T15:59:18+09:00
+**User Input**: "✅ Continue to Next Stage - Approve functional design and proceed to Code Generation (Unit"
+**AI Response**: Functional Design approved. Proceeding to Code Generation (Unit 1: IdleWatcher).
+**Context**: CONSTRUCTION - Functional Design → Code Generation (Unit 1)
+
+---
+
+## Iteration 4: Code Generation Plan (Unit 1) — Approved
+**Timestamp**: 2026-05-26T16:00:22+09:00
+**User Input**: "✅ Approve & Execute - Approve plan and proceed to Part 2 (Code Generation)"
+**AI Response**: Plan approved. Executing code generation for Unit 1: IdleWatcher.
+**Context**: CONSTRUCTION - Code Generation (Unit 1) Part 2 開始
+
+---
+
+## Iteration 4: Code Generation (Unit 1) — Approved
+**Timestamp**: 2026-05-26T16:06:16+09:00
+**User Input**: "✅ Continue to Next Stage - Proceed to Code Generation (Unit 2: TrayManager)"
+**AI Response**: Unit 1 approved. Proceeding to Unit 2: TrayManager.
+**Context**: CONSTRUCTION - Code Generation (Unit 2)
+
+---
+
+## Iteration 4: Code Generation (Unit 2) — Approved
+**Timestamp**: 2026-05-26T16:08:59+09:00
+**User Input**: "✅ Continue to Next Stage - Proceed to Code Generation (Unit 3: Frontend統合)"
+**AI Response**: Unit 2 approved. Proceeding to Unit 3: Frontend統合.
+**Context**: CONSTRUCTION - Code Generation (Unit 3)
+
+---
+
+## Iteration 4: Code Generation (Unit 3) — Approved
+**Timestamp**: 2026-05-26T16:11:09+09:00
+**User Input**: "✅ Continue to Next Stage - Proceed to Build and Test (全ユニット統合検証)"
+**AI Response**: Unit 3 approved. Proceeding to Build and Test.
+**Context**: CONSTRUCTION - Build and Test
+
+---
