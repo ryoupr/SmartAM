@@ -4,7 +4,6 @@ Thumbs.db
 
 # Editor / IDE
 .claude/
-.kiro/
 .vscode/
 *.swp
 *.swo
