@@ -36,8 +36,11 @@
   let totalHeight = $derived(mails.length * ITEM_HEIGHT);
   let offsetY = $derived(visibleStart * ITEM_HEIGHT);
 
+  let prevSelectedUid: number | null = $state(null);
+
   $effect(() => {
-    if (!selectedUid || !listEl) return;
+    if (!selectedUid || !listEl || selectedUid === prevSelectedUid) return;
+    prevSelectedUid = selectedUid;
     const idx = mails.findIndex(m => m.uid === selectedUid);
     if (idx >= 0) {
       const itemTop = idx * ITEM_HEIGHT;
