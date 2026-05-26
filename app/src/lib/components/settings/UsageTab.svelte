@@ -94,8 +94,8 @@
   onMount(() => { fetchAll(); });
 
   // [中8] nullガード付きの安全な値取得
-  let totalCost = $derived(aiUsage?.total_cost_usd ?? 0);
-  let budgetLimit = $derived(aiUsage?.budget_limit_usd ?? 0);
+  let totalCost = $derived((aiUsage as UsageSummary | null)?.total_cost_usd ?? 0);
+  let budgetLimit = $derived((aiUsage as UsageSummary | null)?.budget_limit_usd ?? 0);
 
   let lineChartData = $derived.by(() => {
     const c = getChartColors();
@@ -121,7 +121,7 @@
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { font: { size: 10 }, color: c.overlay }, grid: { color: c.surface0 } },
-        y: { ticks: { font: { size: 10 }, color: c.overlay, callback: (v: number) => `$${v.toFixed(3)}` }, grid: { color: c.surface0 } },
+        y: { ticks: { font: { size: 10 }, color: c.overlay, callback: (v: string | number) => `$${Number(v).toFixed(3)}` }, grid: { color: c.surface0 } },
       },
     };
   });
