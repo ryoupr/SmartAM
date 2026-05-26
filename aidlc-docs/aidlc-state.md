@@ -56,3 +56,22 @@
 
 ### Process Deviations
 - question-format-guide: 質問をチャット内で直接実施（ファイル未作成）。理由: 軽微な改善で選択肢が明確だったため簡略化。
+
+## Iteration 3: バグ修正 + TSエラー修正
+**Start Date**: 2026-05-26T14:11:00+09:00
+**Scope**: メール一覧スクロール巻き戻しバグ修正 + UsageTab.svelte TSエラー修正
+**Depth**: Minimal（バグ修正）
+**Release**: v0.4.5
+
+### Stage Progress
+- [x] Requirements Analysis (Minimal) — チャット内で確認、原因特定
+- [ ] User Stories — SKIP（バグ修正）
+- [x] Workflow Planning — 2修正（MailList $effect + UsageTab 型エラー）
+- [ ] Application Design — SKIP（既存コンポーネント内修正）
+- [x] Code Generation — 完了
+- [x] Build Verification — npm run check ✅ (0 errors) / cargo check ✅
+- [x] Release — v0.4.5 (PR #33, #34)
+
+### Process Deviations
+- AI-DLC ワークフロー未遵守: Inception Phase を明示的に開始せず直接修正に入った。aidlc-state.md / audit.md の事前更新を怠った。事後に整合性を修復。
+- question-format-guide: 質問をチャット内で直接実施（ファイル未作成）。理由: バグ報告に対する即時対応。

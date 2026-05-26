@@ -191,3 +191,25 @@
 | SECURITY-06〜09 | N/A | IAM/ネットワーク/認証/デプロイ変更なし |
 
 **Result**: ✅ No blocking findings.
+
+## Iteration 3: バグ修正 + TSエラー修正
+**Timestamp**: 2026-05-26T14:11:00+09:00
+
+### User Request
+「メールを選択した状態でメール一覧をスクロールしても、選択メールが画面外に出ると巻き戻される」
+
+### Root Cause
+MailList.svelte L37-43 の `$effect` が `scrollTop` を暗黙的依存として追跡。スクロールのたびに発火し、選択メール位置に強制スクロールしていた。
+
+### Changes
+1. **MailList.svelte**: `$effect` に `prevSelectedUid` ガード追加。`selectedUid` 変化時のみスクロール調整。
+2. **UsageTab.svelte**: `aiUsage` の型アサーション追加 + Chart.js callback 引数型修正（3 TS errors → 0）
+
+### Release
+- v0.4.4: スクロール修正のみ
+- v0.4.5: TSエラー修正を追加
+
+### Process Deviation Log
+- ⚠️ AI-DLC ワークフロー未遵守: セッション開始時に AI-DLC を起動したが、バグ報告受領後にワークフローを経由せず直接修正に入った。事後に aidlc-state.md / audit.md を修復。
+
+---
