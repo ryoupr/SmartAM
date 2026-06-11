@@ -329,12 +329,11 @@ fn on_new_mail(
         let _ = n.show();
         // Play sound via afplay (NSUserNotification sound is broken on macOS 13+)
         if !sound.is_empty() {
-            let path = if sound.starts_with('/') {
-                sound
-            } else if sound == "default" {
+            let safe_name = sound.replace(['/', '\\', '.', '\0'], "");
+            let path = if safe_name.is_empty() || safe_name == "default" {
                 "/System/Library/Sounds/Tink.aiff".to_string()
             } else {
-                format!("/System/Library/Sounds/{}.aiff", sound)
+                format!("/System/Library/Sounds/{}.aiff", safe_name)
             };
             let _ = std::process::Command::new("afplay").arg(path).output();
         }

@@ -683,11 +683,8 @@ fn send_test_notification(sound: String) -> Result<(), String> {
 
 #[tauri::command]
 fn preview_sound(name: String) -> Result<(), String> {
-    let path = if name.starts_with('/') {
-        name // absolute path = custom file
-    } else {
-        format!("/System/Library/Sounds/{}.aiff", if name == "default" { "Tink" } else { &name })
-    };
+    let safe_name = name.replace(['/', '\\', '.', '\0'], "");
+    let path = format!("/System/Library/Sounds/{}.aiff", if safe_name.is_empty() || safe_name == "default" { "Tink".to_string() } else { safe_name });
     std::process::Command::new("afplay")
         .arg(&path)
         .spawn()
@@ -707,12 +704,11 @@ fn send_macos_notification(title: &str, body: &str, sound: &str) -> Result<(), S
     }
     // Play sound separately
     if !sound.is_empty() {
-        let path = if sound.starts_with('/') {
-            sound.to_string()
-        } else if sound == "default" {
+        let safe_name = sound.replace(['/', '\\', '.', '\0'], "");
+        let path = if safe_name.is_empty() || safe_name == "default" {
             "/System/Library/Sounds/Tink.aiff".to_string()
         } else {
-            format!("/System/Library/Sounds/{}.aiff", sound)
+            format!("/System/Library/Sounds/{}.aiff", safe_name)
         };
         std::process::Command::new("afplay").arg(path).spawn().ok();
     }

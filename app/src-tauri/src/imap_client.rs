@@ -304,12 +304,12 @@ pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, lim
     let result = async {
         let imap_folder = resolve_folder(&config.email, folder);
         session.select(&imap_folder).await.map_err(|e| format!("フォルダ選択失敗: {e}"))?;
-        let gmail_query = format!("X-GM-RAW \"{}\"", query.replace('"', "\\\""));
+        let sanitized_query = query.replace(['"', '\r', '\n', '\0'], "");
+        let gmail_query = format!("X-GM-RAW \"{}\"", sanitized_query);
         let uids: Vec<u32> = match session.uid_search(&gmail_query).await {
             Ok(set) => set.into_iter().collect(),
             Err(_) => {
-                let escaped = query.replace('"', "\\\"");
-                let fallback = format!("OR SUBJECT \"{}\" FROM \"{}\"", escaped, escaped);
+                let fallback = format!("OR SUBJECT \"{}\" FROM \"{}\"", sanitized_query, sanitized_query);
                 session.uid_search(&fallback).await.map_err(|e| format!("検索失敗: {e}"))?.into_iter().collect()
             }
         };
@@ -517,7 +517,8 @@ pub async fn fetch_thread(config: &AccountConfig, folder: &str, subject: &str) -
     let result = async {
         session.select(resolve_folder(&config.email, folder)).await.map_err(|e| format!("{e}"))?;
         let clean_subject = subject.trim_start_matches("Re: ").trim_start_matches("Fwd: ");
-        let query = format!("SUBJECT \"{}\"", clean_subject.replace('"', "\\\""));
+        let sanitized = clean_subject.replace(['"', '\r', '\n', '\0'], "");
+        let query = format!("SUBJECT \"{}\"", sanitized);
         let uids: HashSet<u32> = session.uid_search(&query).await.map_err(|e| format!("検索失敗: {e}"))?;
         if uids.is_empty() { return Ok(vec![]); }
         let range: String = uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");

@@ -49,7 +49,7 @@ pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str)
         return Err(format!("不正な終了日時: {}", event.end));
     }
     // Sanitize calendar_name: remove quotes and newlines
-    let cal_name = calendar_name.replace('"', "").replace('\n', "").replace('\r', "");
+    let cal_name = escape_applescript(calendar_name);
 
     let script = format!(
         r#"tell application "Calendar"
@@ -72,10 +72,10 @@ pub async fn register_apple_calendar(event: &CalendarEvent, calendar_name: &str)
     end tell
 end tell"#,
         cal = cal_name,
-        title = event.title.replace('"', "\\\""),
+        title = escape_applescript(&event.title),
         start = &event.start,
         end = &event.end,
-        loc = event.location.replace('"', "\\\""),
+        loc = escape_applescript(&event.location),
     );
 
     let output = std::process::Command::new("osascript")
@@ -105,3 +105,7 @@ end tell"#,
     }
 }
 
+
+fn escape_applescript(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ").replace('\r', " ")
+}
