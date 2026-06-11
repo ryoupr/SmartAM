@@ -26,9 +26,18 @@
   const ITEM_HEIGHT = 50;
   const OVERSCAN = 5;
 
-  let listEl: HTMLDivElement | undefined = $state(undefined);
+  let scrollEl: HTMLDivElement | undefined = $state(undefined);
   let scrollTop = $state(0);
   let clientHeight = $state(600);
+
+  // ResizeObserver で clientHeight を実DOMに追従
+  $effect(() => {
+    if (!scrollEl) return;
+    clientHeight = scrollEl.clientHeight;
+    const ro = new ResizeObserver(() => { clientHeight = scrollEl!.clientHeight; });
+    ro.observe(scrollEl);
+    return () => ro.disconnect();
+  });
 
   let visibleStart = $derived(Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN));
   let visibleEnd = $derived(Math.min(mails.length, Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + OVERSCAN));
@@ -39,13 +48,15 @@
   let prevSelectedUid: number | null = $state(null);
 
   $effect(() => {
-    if (!selectedUid || !listEl || selectedUid === prevSelectedUid) return;
+    if (!selectedUid || !scrollEl || selectedUid === prevSelectedUid) return;
     prevSelectedUid = selectedUid;
     const idx = mails.findIndex(m => m.uid === selectedUid);
     if (idx >= 0) {
       const itemTop = idx * ITEM_HEIGHT;
       if (itemTop < scrollTop || itemTop + ITEM_HEIGHT > scrollTop + clientHeight) {
-        listEl.scrollTop = itemTop - clientHeight / 2 + ITEM_HEIGHT / 2;
+        const newTop = itemTop - clientHeight / 2 + ITEM_HEIGHT / 2;
+        scrollEl.scrollTop = newTop;
+        scrollTop = scrollEl.scrollTop; // 即時同期
       }
     }
   });
@@ -63,11 +74,13 @@
         selectedUids = next;
         onMultiSelect?.(selectedUids);
       }
+      onSelect(uid); // selectedUid を最後にクリックした位置に同期
     } else if (e.ctrlKey || e.metaKey) {
       const next = new Set(selectedUids);
       if (next.has(uid)) next.delete(uid); else next.add(uid);
       selectedUids = next;
       onMultiSelect?.(selectedUids);
+      onSelect(uid); // selectedUid を最後にクリックした位置に同期
     } else {
       selectedUids = new Set();
       onSelect(uid);
@@ -79,15 +92,17 @@
     const el = e.target as HTMLElement;
     scrollTop = el.scrollTop;
     clientHeight = el.clientHeight;
-    // Infinite scroll: load more when near bottom
-    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (remaining < ITEM_HEIGHT * 10 && !loadingMore && !loading && onLoadMore) {
-      onLoadMore();
+    // Infinite scroll: アイテムベースで判定（ヘッダー高さ影響を排除）
+    if (mails.length > 0 && !loadingMore && !loading && onLoadMore) {
+      const lastVisible = Math.floor((scrollTop + clientHeight) / ITEM_HEIGHT);
+      if (mails.length - lastVisible < 10) {
+        onLoadMore();
+      }
     }
   }
 </script>
 
-<div class="mail-list" onscroll={handleScroll} bind:this={listEl}>
+<div class="mail-list">
   <div class="list-header">
     <span class="list-title">{folderLabel}</span>
     <span class="list-count">{mails.length} 件{unreadCount > 0 ? ` · 新着 ${unreadCount}` : ''}</span>
@@ -102,29 +117,31 @@
   {#if loading}
     <div class="empty">読み込み中...</div>
   {:else}
-    <div class="virtual-container" style:height="{totalHeight}px">
-      <div class="virtual-offset" style:transform="translateY({offsetY}px)">
-        {#each visibleMails as mail (mail.uid)}
-          <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
-            <div class="mail-header">
-              <span class="from">{mail.from}</span>
-              <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
-            </div>
-            <div class="subject">{mail.subject}</div>
-          </button>
-        {:else}
-          <div class="empty">メールがありません</div>
-        {/each}
+    <div class="scroll-area" onscroll={handleScroll} bind:this={scrollEl}>
+      <div class="virtual-container" style:height="{totalHeight}px">
+        <div class="virtual-offset" style:transform="translateY({offsetY}px)">
+          {#each visibleMails as mail (mail.uid)}
+            <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
+              <div class="mail-header">
+                <span class="from">{mail.from}</span>
+                <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
+              </div>
+              <div class="subject">{mail.subject}</div>
+            </button>
+          {:else}
+            <div class="empty">メールがありません</div>
+          {/each}
+        </div>
       </div>
+      {#if loadingMore}
+        <div class="loading-more">読み込み中...</div>
+      {/if}
     </div>
-    {#if loadingMore}
-      <div class="loading-more">読み込み中...</div>
-    {/if}
   {/if}
 </div>
 
 <style>
-  .mail-list { width:380px;min-width:380px;border-right:1px solid var(--surface1);overflow-y:auto;display:flex;flex-direction:column }
+  .mail-list { width:380px;min-width:380px;border-right:1px solid var(--surface1);display:flex;flex-direction:column;overflow:hidden }
   .list-header { display:flex;align-items:center;padding:12px 12px 4px;gap:8px;flex-shrink:0 }
   .list-title { font-size:17px;font-weight:700;color:var(--ink, var(--text)) }
   .list-count { font-size:11px;color:var(--ink-60, var(--overlay));flex:1 }
@@ -136,7 +153,8 @@
   .search input::placeholder { color:var(--ink-40, var(--overlay)) }
   .clear { position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--overlay);cursor:pointer;font-size:11px }
   .result-count { padding:0 12px 4px;color:var(--ink-60, var(--overlay));font-size:9px;flex-shrink:0 }
-  .virtual-container { position:relative;flex:1 }
+  .scroll-area { flex:1;overflow-y:auto;position:relative }
+  .virtual-container { position:relative }
   .virtual-offset { position:absolute;left:0;right:0;top:0 }
   .mail-item { padding:12px 16px 12px 13px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--line, var(--surface1));border-left:3px solid transparent;height:50px;box-sizing:border-box;outline:none;width:100%;display:block }
   .mail-item:hover { background:var(--paper, var(--surface0)) }

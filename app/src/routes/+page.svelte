@@ -162,6 +162,7 @@
     const a = acc(); if (!a || !selectedUid) return;
     const uid = selectedUid; const idx = mails.findIndex(m => m.uid === uid); const prevMails = mails;
     mails = mails.filter(m => m.uid !== uid);
+    if (selectedUids.has(uid)) { const next = new Set(selectedUids); next.delete(uid); selectedUids = next; }
     const next = mails[idx] ?? mails[idx - 1]; if (next) handleSelect(next.uid); else { selectedMail = null; selectedUid = null; }
     let aborted = false;
     showToast('📦 アーカイブしました', () => { aborted = true; mails = prevMails; handleSelect(uid); });
@@ -217,11 +218,11 @@
     if (selectedUids.size > 0 && action === 'archive') { handleBulkArchive(); return; }
     if (selectedUids.size > 0 && action === 'delete') { handleBulkDelete(); return; }
     if (selectedUids.size > 0 && action === 'star') { handleBulkStar(true); return; }
-    const idx = mails.findIndex(m => m.uid === selectedUid);
+    const idx = filteredMails.findIndex(m => m.uid === selectedUid);
     const btn = (s: string) => document.querySelector<HTMLButtonElement>(s)?.click();
     ({
-      nextMail: () => { if (idx >= 0 && idx < mails.length - 1) handleSelect(mails[idx + 1].uid); else if (idx === -1 && mails.length > 0) handleSelect(mails[0].uid); },
-      prevMail: () => { if (idx > 0) handleSelect(mails[idx - 1].uid); },
+      nextMail: () => { if (idx >= 0 && idx < filteredMails.length - 1) handleSelect(filteredMails[idx + 1].uid); else if (idx === -1 && filteredMails.length > 0) handleSelect(filteredMails[0].uid); },
+      prevMail: () => { if (idx > 0) handleSelect(filteredMails[idx - 1].uid); },
       openMail: () => { if (selectedUid && !selectedMail) handleSelect(selectedUid); },
       backToList: () => { selectedMail = null; selectedUid = null; },
       reply: () => { if (selectedMail) openReply(); },
