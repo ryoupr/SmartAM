@@ -40,7 +40,11 @@ pub async fn start_flow() -> Result<OAuthTokens, String> {
     log::debug!("OAuth listening on port {port}");
 
     let cid = client_id();
-    let state = format!("{:x}{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(), std::process::id());
+    let state = {
+        use rand::Rng;
+        let bytes: [u8; 32] = rand::thread_rng().gen();
+        bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
+    };
     let url = reqwest::Url::parse_with_params(AUTH_URL, &[
         ("client_id", cid.as_str()),
         ("redirect_uri", redirect_uri.as_str()),

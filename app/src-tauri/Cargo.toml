@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.4.9"
+version = "0.4.10"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -45,3 +45,4 @@ open = "5"
 ical = "0.11"
 regex = "1"
 notify-rust = "4"
+rand = "0.8"

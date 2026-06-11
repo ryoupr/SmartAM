@@ -19,7 +19,17 @@
 
 ## 手順
 
-### 1. バージョンバンプ + develop → main マージ
+### 1. feature ブランチを develop に PR マージ
+
+```bash
+git push -u origin feature/xxx
+gh pr create --base develop --title "feat: ..." --body "..." --reviewer @copilot
+# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
+# GitHub上でマージ → feature ブランチ削除
+git checkout develop && git pull origin develop
+```
+
+### 2. バージョンバンプ + develop に push
 
 ```bash
 # develop で3ファイルのバージョンを更新
@@ -27,13 +37,18 @@ git checkout develop && git pull origin develop
 # ... 3ファイル編集 ...
 git add -A && git commit -m "chore: bump version to X.Y.Z"
 git push origin develop
-
-# main にマージ（⚠️ develop を削除しない）
-git checkout main && git pull origin main
-git merge develop --no-edit && git push origin main
 ```
 
-### 2. ビルド（署名付き）
+### 3. develop → main を PR マージ
+
+```bash
+gh pr create --base main --head develop --title "release: vX.Y.Z" --body "バージョン X.Y.Z リリース" --reviewer @copilot
+# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
+# GitHub上でマージ（⚠️ develop を削除しない）
+git checkout main && git pull origin main
+```
+
+### 4. ビルド（署名付き）
 
 ```bash
 cd app && npx tauri build
@@ -52,7 +67,7 @@ Finished 1 updater signature at:
 - `target/release/bundle/macos/SmartAM.app.tar.gz`
 - `target/release/bundle/macos/SmartAM.app.tar.gz.sig`
 
-### 3. latest.json 生成
+### 5. latest.json 生成
 
 ```bash
 cd /path/to/SmartAM
@@ -62,7 +77,7 @@ sig = open('app/src-tauri/target/release/bundle/macos/SmartAM.app.tar.gz.sig').r
 json.dump({
   'version': 'X.Y.Z',
   'notes': 'リリースノート',
-  'pub_date': datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+  'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
   'platforms': {'darwin-aarch64': {
     'signature': sig,
     'url': 'https://github.com/ryoupr/SmartAM/releases/download/vX.Y.Z/SmartAM.app.tar.gz'
@@ -71,7 +86,7 @@ json.dump({
 "
 ```
 
-### 4. タグ + GitHub Release
+### 6. タグ + GitHub Release
 
 ```bash
 git tag vX.Y.Z && git push origin vX.Y.Z
@@ -84,18 +99,27 @@ gh release create vX.Y.Z \
   --title "vX.Y.Z" --target main --notes "リリースノート"
 ```
 
-### 5. develop を main に同期
+### 7. main → develop 同期（PR 経由）
 
 ```bash
-git checkout develop && git merge main --no-edit && git push origin develop
+gh pr create --base develop --head main --title "sync: main → develop after vX.Y.Z" --body "リリース後の同期"
+# GitHub上でマージ
+git checkout develop && git pull origin develop
 ```
 
-### 6. 確認
+### 8. 確認
 
 ```bash
 gh release view vX.Y.Z
 curl -sL https://github.com/ryoupr/SmartAM/releases/latest/download/latest.json | python3 -m json.tool
 ```
+
+## 禁止事項
+
+- ローカルで `main` や `develop` に直接 `git merge` しない（必ず PR 経由）
+- 署名なしでリリースしない（`TAURI_SIGNING_PRIVATE_KEY` 必須）
+- latest.json なしでリリースしない（自動アップデートが壊れる）
+- develop ブランチを削除しない
 
 ## よくあるトラブル
 
