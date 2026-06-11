@@ -23,7 +23,8 @@
 
 ```bash
 git push -u origin feature/xxx
-gh pr create --base develop --title "feat: ..." --body "..."
+gh pr create --base develop --title "feat: ..." --body "..." --reviewer @copilot
+# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
 # GitHub上でマージ → feature ブランチ削除
 git checkout develop && git pull origin develop
 ```
@@ -41,7 +42,8 @@ git push origin develop
 ### 3. develop → main を PR マージ
 
 ```bash
-gh pr create --base main --head develop --title "release: vX.Y.Z" --body "バージョン X.Y.Z リリース"
+gh pr create --base main --head develop --title "release: vX.Y.Z" --body "バージョン X.Y.Z リリース" --reviewer @copilot
+# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
 # GitHub上でマージ（⚠️ develop を削除しない）
 git checkout main && git pull origin main
 ```
