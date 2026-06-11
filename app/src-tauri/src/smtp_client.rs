@@ -74,8 +74,15 @@ pub async fn send_mail_with_attachments(
     );
 
     for path in attachment_paths {
-        let data = std::fs::read(path).map_err(|e| format!("ファイル読み込み失敗: {e}"))?;
-        let filename = std::path::Path::new(path).file_name()
+        let canonical = std::fs::canonicalize(path)
+            .map_err(|e| format!("添付ファイルパス解決失敗: {e}"))?;
+        let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("/"));
+        let tmp = std::env::temp_dir();
+        if !canonical.starts_with(&home) && !canonical.starts_with(&tmp) {
+            return Err(format!("許可されていないパス: {}", canonical.display()));
+        }
+        let data = std::fs::read(&canonical).map_err(|e| format!("ファイル読み込み失敗: {e}"))?;
+        let filename = canonical.file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "attachment".into());
         let content_type = CT::parse("application/octet-stream").unwrap();

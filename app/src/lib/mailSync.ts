@@ -5,18 +5,29 @@ import type { AppSettings } from '$lib/store';
 
 export type FolderCache = Map<string, { mails: MailSummary[]; offset: number; hasMore: boolean }>;
 
+// Singleton in-flight token refresh to prevent concurrent refresh races
+const _inflight = new Map<number, Promise<void>>();
+
 export async function refreshOAuthToken(settings: AppSettings, index: number): Promise<void> {
   const a = settings.accounts[index];
   if (!a || a.auth_type !== 'oauth') return;
   const now = Math.floor(Date.now() / 1000);
   if (a.token_expires_at > now + 60) return;
-  const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>(
-    'google_oauth_refresh', { refreshToken: a.refresh_token }
-  );
-  a.access_token = tokens.access_token;
-  a.token_expires_at = tokens.expires_at;
-  settings.accounts[index] = { ...a };
-  await saveSettings(settings);
+
+  const existing = _inflight.get(index);
+  if (existing) return existing;
+
+  const p = (async () => {
+    const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>(
+      'google_oauth_refresh', { refreshToken: a.refresh_token }
+    );
+    a.access_token = tokens.access_token;
+    a.token_expires_at = tokens.expires_at;
+    settings.accounts[index] = { ...a };
+    await saveSettings(settings);
+  })();
+  _inflight.set(index, p);
+  try { await p; } finally { _inflight.delete(index); }
 }
 
 export async function fetchMailPage(
@@ -55,16 +66,7 @@ export async function prefetchAllFolders(
       if (folderCache.has(key)) continue;
       try {
         if (a.auth_type === 'oauth') {
-          const now = Math.floor(Date.now() / 1000);
-          if (a.token_expires_at <= now + 60) {
-            const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>(
-              'google_oauth_refresh', { refreshToken: a.refresh_token }
-            );
-            a.access_token = tokens.access_token;
-            a.token_expires_at = tokens.expires_at;
-            settings.accounts[i] = { ...a };
-            await saveSettings(settings);
-          }
+          await refreshOAuthToken(settings, i);
         }
         const [result, total] = await invoke<[MailSummary[], number]>(
           'fetch_mail_page', { config: getImapConfig(a), folder, offset: 0, limit: pageSize * 2 }
@@ -83,7 +85,7 @@ export async function sendNotificationForNewMails(
   trace: (tag: string, msg: string) => void
 ): Promise<void> {
   const a = settings.accounts[settings.activeAccountIndex];
-  if (!a?.notifications) return;
+  if (!a?.notifications || newMails.length === 0) return;
   try {
     const { sendNotification } = await import('@tauri-apps/plugin-notification');
     const latest = newMails[0];

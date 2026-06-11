@@ -99,7 +99,8 @@ async function archiveMail(account: Account, uid: number, onUndo?: () => void, o
   else { selectedMail = null; selectedUid = null; }
 
   let aborted = false;
-  const undoFn = () => { aborted = true; mails = prevMails; onUndo?.(); };
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  const undoFn = () => { aborted = true; if (retryTimer) clearTimeout(retryTimer); mails = prevMails; onUndo?.(); };
 
   const doArchive = async (attempt: number) => {
     if (aborted) return;
@@ -108,7 +109,7 @@ async function archiveMail(account: Account, uid: number, onUndo?: () => void, o
       await invoke('archive_mail', { config: getImapConfig(account), folder: activeFolder, uid });
     } catch (e) {
       if (aborted) return;
-      if (attempt < 10) setTimeout(() => doArchive(attempt + 1), 1000 * attempt);
+      if (attempt < 10) retryTimer = setTimeout(() => doArchive(attempt + 1), 1000 * attempt);
       else { mails = prevMails; error = 'アーカイブ失敗: ' + String(e); }
     }
   };

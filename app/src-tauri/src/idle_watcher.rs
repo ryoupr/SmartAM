@@ -92,11 +92,16 @@ pub async fn start(app: AppHandle, configs: Vec<WatcherAccountConfig>) {
 }
 
 pub async fn stop_all() {
-    let mut watcher = WATCHER.lock().await;
-    if let Some(w) = watcher.take() {
-        for h in w.handles {
-            h.abort();
+    let handles = {
+        let mut watcher = WATCHER.lock().await;
+        match watcher.take() {
+            Some(w) => w.handles,
+            None => return,
         }
+    };
+    for h in handles {
+        h.abort();
+        let _ = h.await;
     }
 }
 
@@ -181,7 +186,7 @@ async fn connect_and_idle(
 
     // Set baseline UID on first connect (don't notify for existing mails)
     if *last_uid == 0 {
-        *last_uid = mbox.exists;
+        *last_uid = mbox.uid_next.unwrap_or(1).saturating_sub(1);
     }
 
     // Issue IDLE
@@ -282,7 +287,13 @@ async fn poll_fallback(
         // Every 10 polls, try to restore IDLE
         if poll_count % 10 == 0 {
             log::debug!("poll_fallback: attempting IDLE restore for {}:{}", cfg.account.email, folder);
-            if connect_and_idle(&cfg.account, imap_folder, last_uid).await.is_ok() {
+            if let Ok(new_mails) = connect_and_idle(&cfg.account, imap_folder, last_uid).await {
+                if !new_mails.is_empty() {
+                    on_new_mail(app, cfg, &new_mails, paused);
+                    if let Some(max_uid) = new_mails.iter().map(|m| m.uid).max() {
+                        *last_uid = (*last_uid).max(max_uid);
+                    }
+                }
                 log::info!("Polling→IDLE restored: {}:{}", cfg.account.email, folder);
                 update_status(statuses, cfg.account_index, folder, "idle", None).await;
                 emit_status(app, cfg.account_index, folder, "connected");
@@ -329,7 +340,7 @@ fn on_new_mail(
         let _ = n.show();
         // Play sound via afplay (NSUserNotification sound is broken on macOS 13+)
         if !sound.is_empty() {
-            let safe_name = sound.replace(['/', '\\', '.', '\0'], "");
+            let safe_name: String = sound.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
             let path = if safe_name.is_empty() || safe_name == "default" {
                 "/System/Library/Sounds/Tink.aiff".to_string()
             } else {
