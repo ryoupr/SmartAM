@@ -104,7 +104,7 @@
   {:else}
     <div class="virtual-container" style:height="{totalHeight}px">
       <div class="virtual-offset" style:transform="translateY({offsetY}px)">
-        {#each visibleMails as mail}
+        {#each visibleMails as mail (mail.uid)}
           <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
             <div class="mail-header">
               <span class="from">{mail.from}</span>
@@ -140,8 +140,8 @@
   .virtual-offset { position:absolute;left:0;right:0;top:0 }
   .mail-item { padding:12px 16px 12px 13px;border:none;background:none;text-align:left;cursor:pointer;border-bottom:1px solid var(--line, var(--surface1));border-left:3px solid transparent;height:50px;box-sizing:border-box;outline:none;width:100%;display:block }
   .mail-item:hover { background:var(--paper, var(--surface0)) }
-  .mail-item.selected { background:var(--paper-wh, var(--surface0));border-left-color:var(--red) }
-  .mail-item.unread { border-left-color:var(--red) }
+  .mail-item.selected { background:var(--paper-wh, var(--surface0));border-left-color:var(--blue) }
+  .mail-item.unread:not(.selected) { border-left-color:var(--red) }
   .mail-item.unread .from { font-weight:600 }
   .mail-item.unread .subject { font-weight:500 }
   .mail-header { display:flex;justify-content:space-between;margin-bottom:4px }

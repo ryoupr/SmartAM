@@ -5,8 +5,42 @@
   let { settings = $bindable() }: { settings: AppSettings } = $props();
 
   let llmTestResult = $state('');
-  let bedrockModels: string[] = $state([]);
+  interface BedrockModelInfo {
+    model_id: string;
+    model_name: string;
+    provider_name: string;
+    input_modalities: string[];
+    output_modalities: string[];
+    input_price: number | null;
+    output_price: number | null;
+  }
+  let bedrockModels: BedrockModelInfo[] = $state([]);
   let bedrockModelsLoading = $state(false);
+  let sortCol = $state<string>('');
+  let sortAsc = $state(true);
+
+  let sortedBedrockModels = $derived.by(() => {
+    let list = bedrockModels.filter(m => m.output_modalities.includes('TEXT') && !m.output_modalities.includes('SPEECH') && !m.output_modalities.includes('VIDEO'));
+    if (!sortCol) return list;
+    return [...list].sort((a, b) => {
+      let va: any, vb: any;
+      switch (sortCol) {
+        case 'provider': va = a.provider_name; vb = b.provider_name; break;
+        case 'model': va = a.model_name; vb = b.model_name; break;
+        case 'input': va = a.input_price ?? 9999; vb = b.input_price ?? 9999; break;
+        case 'output': va = a.output_price ?? 9999; vb = b.output_price ?? 9999; break;
+        case 'modality': va = a.input_modalities.join(','); vb = b.input_modalities.join(','); break;
+        default: return 0;
+      }
+      const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+      return sortAsc ? cmp : -cmp;
+    });
+  });
+
+  function toggleSort(col: string) {
+    if (sortCol === col) { sortAsc = !sortAsc; }
+    else { sortCol = col; sortAsc = true; }
+  }
 
   const providers: { id: LlmProvider; label: string }[] = [
     { id: 'ollama', label: 'Ollama（ローカル）' },
@@ -20,9 +54,16 @@
     if (!settings.llm.bedrock.api_key || !settings.llm.bedrock.region) return;
     bedrockModelsLoading = true;
     try {
-      bedrockModels = await invoke<string[]>('list_bedrock_models', { region: settings.llm.bedrock.region, apiKey: settings.llm.bedrock.api_key });
+      bedrockModels = await invoke<BedrockModelInfo[]>('list_bedrock_models', { region: settings.llm.bedrock.region, apiKey: settings.llm.bedrock.api_key });
     } catch { bedrockModels = []; }
     finally { bedrockModelsLoading = false; }
+  }
+
+  function fmtPrice(p: number | null): string {
+    if (p === null || p === 0) return '-';
+    if (p < 0.01) return `$${p.toFixed(4)}`;
+    if (p < 1) return `$${p.toFixed(3)}`;
+    return `$${p.toFixed(2)}`;
   }
 
   async function testLlmConnection() {
@@ -74,9 +115,29 @@
       {/if}
       <label class="fl">モデル
         {#if bedrockModels.length > 0}
-          <select bind:value={settings.llm.bedrock.model}>
-            {#each bedrockModels as m}<option value={m}>{m}</option>{/each}
-          </select>
+          <div class="model-table-wrap">
+            <table class="model-table">
+              <thead><tr>
+                <th class="sortable" onclick={() => toggleSort('provider')}>Provider{sortCol==='provider'?(sortAsc?' ▲':' ▼'):''}</th>
+                <th class="sortable" onclick={() => toggleSort('model')}>Model{sortCol==='model'?(sortAsc?' ▲':' ▼'):''}</th>
+                <th class="sortable" onclick={() => toggleSort('input')}>In $/1M{sortCol==='input'?(sortAsc?' ▲':' ▼'):''}</th>
+                <th class="sortable" onclick={() => toggleSort('output')}>Out $/1M{sortCol==='output'?(sortAsc?' ▲':' ▼'):''}</th>
+                <th class="sortable" onclick={() => toggleSort('modality')}>Modality{sortCol==='modality'?(sortAsc?' ▲':' ▼'):''}</th>
+              </tr></thead>
+              <tbody>
+                {#each sortedBedrockModels as m}
+                  {@const selected = settings.llm.bedrock.model === m.model_id}
+                  <tr class:sel={selected} onclick={() => settings.llm.bedrock.model = m.model_id}>
+                    <td class="prov">{m.provider_name}</td>
+                    <td class="mn">{m.model_name}</td>
+                    <td class="pr">{fmtPrice(m.input_price)}</td>
+                    <td class="pr">{fmtPrice(m.output_price)}</td>
+                    <td class="mod">{m.input_modalities.join(',')}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {:else}
           <input bind:value={settings.llm.bedrock.model} placeholder="us.anthropic.claude-sonnet-4-20250514-v1:0" />
           {#if settings.llm.bedrock.auth_mode === 'api_key' && settings.llm.bedrock.api_key}
@@ -113,4 +174,15 @@
   .btn-sm { padding:4px 12px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px;cursor:pointer }
   .btn-sm.gb { border-color:var(--green);color:var(--green) }
   .tr { margin-top:6px;font-size:11px }
+  .model-table-wrap { max-height:200px;overflow-y:auto;margin-top:4px;border:1px solid var(--surface1);border-radius:4px }
+  .model-table { width:100%;border-collapse:collapse;font-size:10px }
+  .model-table th { position:sticky;top:0;background:var(--surface0);padding:3px 6px;text-align:left;font-weight:600;border-bottom:1px solid var(--surface1) }
+  .model-table th.sortable { cursor:pointer;user-select:none }
+  .model-table th.sortable:hover { color:var(--green) }
+  .model-table td { padding:3px 6px;border-bottom:1px solid var(--surface0);cursor:pointer }
+  .model-table tr:hover td { background:var(--surface0) }
+  .model-table tr.sel td { background:var(--green);color:var(--base);font-weight:600 }
+  .model-table .prov { color:var(--overlay);white-space:nowrap }
+  .model-table .pr { text-align:right;font-family:monospace;white-space:nowrap }
+  .model-table .mod { color:var(--overlay);font-size:9px }
 </style>

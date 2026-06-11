@@ -213,14 +213,26 @@ async fn send_mail_with_attachments(config: SmtpConfig, to: Vec<String>, cc: Vec
     smtp_client::send_mail_with_attachments(&config, &to, &cc, &bcc, &subject, &body, &attachment_paths).await
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct BedrockModelInfo {
+    model_id: String,
+    model_name: String,
+    provider_name: String,
+    input_modalities: Vec<String>,
+    output_modalities: Vec<String>,
+    input_price: Option<f64>,
+    output_price: Option<f64>,
+}
+
 #[tauri::command]
-async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<String>, String> {
-    log::debug!("list_bedrock_models");
+async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<BedrockModelInfo>, String> {
     if !RE_REGION.is_match(&region) {
         return Err("不正なリージョン名です".into());
     }
-    let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");
     let client = ai_client::http_client();
+
+    // 1. ListFoundationModels
+    let url = format!("https://bedrock.{region}.amazonaws.com/foundation-models");
     let resp = client.get(&url)
         .query(&[("byInferenceType", "ON_DEMAND")])
         .header("Authorization", format!("Bearer {api_key}"))
@@ -229,14 +241,157 @@ async fn list_bedrock_models(region: String, api_key: String) -> Result<Vec<Stri
         let body = resp.text().await.unwrap_or_default();
         return Err(format!("モデル一覧取得失敗: {body}"));
     }
-    #[derive(serde::Deserialize)]
-    struct Resp { #[serde(rename = "modelSummaries")] model_summaries: Vec<Model> }
-    #[derive(serde::Deserialize)]
-    struct Model { #[serde(rename = "modelId")] model_id: String }
-    let data: Resp = resp.json().await.map_err(|e| format!("{e}"))?;
-    let ids: Vec<String> = data.model_summaries.into_iter().map(|m| m.model_id).collect();
-    log::debug!("list_bedrock_models: {} models", ids.len());
-    Ok(ids)
+    #[derive(Deserialize)]
+    struct FmResp { #[serde(rename = "modelSummaries")] model_summaries: Vec<FmModel> }
+    #[derive(Deserialize)]
+    struct FmModel {
+        #[serde(rename = "modelId")] model_id: String,
+        #[serde(rename = "modelName", default)] model_name: String,
+        #[serde(rename = "providerName", default)] provider_name: String,
+        #[serde(rename = "inputModalities", default)] input_modalities: Vec<String>,
+        #[serde(rename = "outputModalities", default)] output_modalities: Vec<String>,
+    }
+    let fm_data: FmResp = resp.json().await.map_err(|e| format!("{e}"))?;
+
+    // 2. Pricing (best-effort, don't fail if unavailable)
+    let pricing = fetch_bedrock_pricing(&client, &region).await.unwrap_or_default();
+    let pricing_keys: Vec<&String> = pricing.keys().collect();
+
+    // 3. Join with fuzzy matching
+    let models: Vec<BedrockModelInfo> = fm_data.model_summaries.into_iter().map(|m| {
+        let normalized = normalize_model_name(&m.model_name);
+        let price = pricing.get(&normalized).or_else(|| {
+            // Fallback: starts_with match
+            pricing_keys.iter()
+                .find(|k| k.starts_with(&normalized) || normalized.starts_with(k.as_str()))
+                .and_then(|k| pricing.get(*k))
+        }).or_else(|| {
+            // Fallback: contains match (shortest pricing key that contains or is contained)
+            pricing_keys.iter()
+                .filter(|k| k.contains(&normalized) || normalized.contains(k.as_str()))
+                .min_by_key(|k| k.len())
+                .and_then(|k| pricing.get(*k))
+        });
+        BedrockModelInfo {
+            model_id: m.model_id,
+            model_name: m.model_name,
+            provider_name: m.provider_name,
+            input_modalities: m.input_modalities,
+            output_modalities: m.output_modalities,
+            input_price: price.map(|p| p.0),
+            output_price: price.map(|p| p.1),
+        }
+    }).collect();
+    Ok(models)
+}
+
+/// Normalize model name for fuzzy matching between ListFoundationModels and Pricing API
+fn normalize_model_name(name: &str) -> String {
+    name.to_lowercase()
+        .replace("(amazon bedrock edition)", "")
+        .replace(" instruct", "")
+        .replace(" chat", "")
+        .replace("-", " ")
+        .replace("  ", " ")
+        .trim().to_string()
+}
+
+/// Fetch pricing from AWS Pricing Bulk API. Returns map of normalized_model_name -> (input_$/1M, output_$/1M)
+async fn fetch_bedrock_pricing(
+    client: &reqwest::Client,
+    region: &str,
+) -> Result<std::collections::HashMap<String, (f64, f64)>, String> {
+    // Try both pricing service codes
+    let urls = [
+        format!("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/region_index.json"),
+        format!("https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrockFoundationModels/current/region_index.json"),
+    ];
+
+    let mut all_prices: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+
+    for region_index_url in &urls {
+        if let Ok(prices) = fetch_pricing_from_service(client, region_index_url, region).await {
+            all_prices.extend(prices);
+        }
+    }
+    Ok(all_prices)
+}
+
+async fn fetch_pricing_from_service(
+    client: &reqwest::Client,
+    region_index_url: &str,
+    region: &str,
+) -> Result<std::collections::HashMap<String, (f64, f64)>, String> {
+    // Get region-specific pricing URL
+    let ri_resp: serde_json::Value = client.get(region_index_url)
+        .send().await.map_err(|e| format!("{e}"))?
+        .json().await.map_err(|e| format!("{e}"))?;
+
+    let version_url = ri_resp["regions"][region]["currentVersionUrl"]
+        .as_str()
+        .ok_or("region not found in pricing")?;
+    let full_url = format!("https://pricing.us-east-1.amazonaws.com{version_url}");
+
+    // Fetch pricing data
+    let data: serde_json::Value = client.get(&full_url)
+        .send().await.map_err(|e| format!("{e}"))?
+        .json().await.map_err(|e| format!("{e}"))?;
+
+    let products = data["products"].as_object().ok_or("no products")?;
+    let terms = &data["terms"]["OnDemand"];
+
+    // Extract per-model input/output prices
+    let mut result: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+
+    for (sku, product) in products {
+        let attrs = &product["attributes"];
+        // AmazonBedrock uses "model" field, AmazonBedrockFoundationModels uses "servicename"
+        let model_name = attrs["model"].as_str()
+            .or_else(|| attrs["servicename"].as_str())
+            .unwrap_or("");
+        if model_name.is_empty() { continue; }
+
+        let feature = attrs["feature"].as_str().unwrap_or("");
+        let usagetype = attrs["usagetype"].as_str().unwrap_or("");
+
+        // Only on-demand inference (skip batch, provisioned, cache)
+        let is_ondemand = feature.contains("On-demand") ||
+            (!usagetype.contains("Batch") && !usagetype.contains("Provisioned") && !usagetype.contains("Cache") && !usagetype.contains("Global"));
+        if !is_ondemand { continue; }
+
+        let inf_type = attrs["inferenceType"].as_str().unwrap_or(usagetype);
+        let is_input = inf_type.contains("nput") && inf_type.contains("oken") &&
+            !inf_type.to_lowercase().contains("video") && !inf_type.to_lowercase().contains("image");
+        let is_output = inf_type.contains("utput") && inf_type.contains("oken") &&
+            !inf_type.to_lowercase().contains("video") && !inf_type.to_lowercase().contains("image");
+
+        // Also check usagetype patterns for AmazonBedrockFoundationModels (no inferenceType field)
+        let is_input = is_input || (usagetype.contains("InputTokenCount-Units") && !usagetype.contains("Cache") && !usagetype.contains("Global"));
+        let is_output = is_output || (usagetype.contains("OutputTokenCount-Units") && !usagetype.contains("Global"));
+
+        if !is_input && !is_output { continue; }
+
+        // Get price
+        if let Some(term_data) = terms.get(sku).and_then(|t| t.as_object()) {
+            for (_tid, tval) in term_data {
+                if let Some(dims) = tval["priceDimensions"].as_object() {
+                    for (_dk, dim) in dims {
+                        if let Some(usd) = dim["pricePerUnit"]["USD"].as_str() {
+                            if let Ok(price) = usd.parse::<f64>() {
+                                let normalized = normalize_model_name(model_name);
+                                let entry = result.entry(normalized).or_insert((0.0, 0.0));
+                                // Convert $/1K tokens to $/1M tokens
+                                let price_per_m = price * 1000.0;
+                                if is_input && entry.0 == 0.0 { entry.0 = price_per_m; }
+                                if is_output && entry.1 == 0.0 { entry.1 = price_per_m; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(result)
 }
 
 #[tauri::command]
