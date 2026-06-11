@@ -34,7 +34,7 @@
   $effect(() => {
     if (!scrollEl) return;
     clientHeight = scrollEl.clientHeight;
-    const ro = new ResizeObserver(() => { clientHeight = scrollEl!.clientHeight; });
+    const ro = new ResizeObserver(() => { if (scrollEl) clientHeight = scrollEl.clientHeight; });
     ro.observe(scrollEl);
     return () => ro.disconnect();
   });

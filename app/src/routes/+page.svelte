@@ -161,19 +161,24 @@
   async function handleArchive() {
     const a = acc(); if (!a || !selectedUid) return;
     const uid = selectedUid; const idx = mails.findIndex(m => m.uid === uid); const prevMails = mails;
+    const prevSearch = searchResults;
     mails = mails.filter(m => m.uid !== uid);
+    if (searchResults) searchResults = searchResults.filter(m => m.uid !== uid);
     if (selectedUids.has(uid)) { const next = new Set(selectedUids); next.delete(uid); selectedUids = next; }
     const next = mails[idx] ?? mails[idx - 1]; if (next) handleSelect(next.uid); else { selectedMail = null; selectedUid = null; }
     let aborted = false;
-    showToast('📦 アーカイブしました', () => { aborted = true; mails = prevMails; handleSelect(uid); });
-    archiveMail(a, activeFolder, uid, 1, () => aborted).catch(e => { mails = prevMails; handleSelect(uid); error = 'アーカイブ失敗: ' + String(e); });
+    showToast('📦 アーカイブしました', () => { aborted = true; mails = prevMails; searchResults = prevSearch; handleSelect(uid); });
+    archiveMail(a, activeFolder, uid, 1, () => aborted).catch(e => { mails = prevMails; searchResults = prevSearch; handleSelect(uid); error = 'アーカイブ失敗: ' + String(e); });
   }
 
   async function handleBulkArchive() {
     const a = acc(); if (!a || selectedUids.size === 0) return;
     const uids = [...selectedUids]; const prevMails = mails; const count = uids.length;
-    mails = mails.filter(m => !selectedUids.has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
-    showToast(`📦 ${count}件アーカイブしました`, () => { mails = prevMails; selectedUids = new Set(uids); });
+    const prevSearch = searchResults;
+    const uidSet = new Set(uids);
+    mails = mails.filter(m => !uidSet.has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
+    if (searchResults) searchResults = searchResults.filter(m => !uidSet.has(m.uid));
+    showToast(`📦 ${count}件アーカイブしました`, () => { mails = prevMails; searchResults = prevSearch; selectedUids = new Set(uids); });
     for (const uid of uids) archiveMail(a, activeFolder, uid, 1, () => false).catch(() => {});
   }
 
@@ -181,7 +186,9 @@
     const a = acc(); if (!a || selectedUids.size === 0) return;
     const uids = [...selectedUids]; await ensureValidToken();
     for (const uid of uids) { try { await deleteMail(a, activeFolder, uid); } catch {} }
-    mails = mails.filter(m => !new Set(uids).has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
+    const uidSet = new Set(uids);
+    mails = mails.filter(m => !uidSet.has(m.uid)); selectedMail = null; selectedUid = null; selectedUids = new Set();
+    if (searchResults) searchResults = searchResults.filter(m => !uidSet.has(m.uid));
     showToast(`🗑 ${uids.length}件削除しました`);
   }
 
@@ -193,7 +200,8 @@
 
   async function handleDeleteExecute() {
     confirmDelete = false; const a = acc(); if (!a || !selectedUid) return; await ensureValidToken();
-    try { await deleteMail(a, activeFolder, selectedUid); mails = mails.filter(m => m.uid !== selectedUid); selectedMail = null; selectedUid = null; showToast('🗑 削除しました'); }
+    const uid = selectedUid;
+    try { await deleteMail(a, activeFolder, uid); mails = mails.filter(m => m.uid !== uid); if (searchResults) searchResults = searchResults.filter(m => m.uid !== uid); if (selectedUids.has(uid)) { const next = new Set(selectedUids); next.delete(uid); selectedUids = next; } selectedMail = null; selectedUid = null; showToast('🗑 削除しました'); }
     catch (e) { error = String(e); }
   }
 
