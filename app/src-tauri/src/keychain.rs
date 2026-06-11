@@ -1,8 +1,20 @@
 use std::process::Command;
+use std::sync::LazyLock;
 
 const SERVICE_NAME: &str = "com.smartam.app";
 
+static RE_SAFE: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"^[a-zA-Z0-9._@\-]+$").unwrap());
+
+fn validate_input(value: &str, field: &str) -> Result<(), String> {
+    if value.is_empty() || !RE_SAFE.is_match(value) {
+        return Err(format!("Invalid {field}: contains disallowed characters"));
+    }
+    Ok(())
+}
+
 pub fn store_credential(account: &str, key_type: &str, secret: &str) -> Result<(), String> {
+    validate_input(account, "account")?;
+    validate_input(key_type, "key_type")?;
     let service = format!("{}.{}", SERVICE_NAME, key_type);
     // Delete existing entry (ignore errors)
     let _ = Command::new("security")
@@ -20,6 +32,8 @@ pub fn store_credential(account: &str, key_type: &str, secret: &str) -> Result<(
 }
 
 pub fn get_credential(account: &str, key_type: &str) -> Result<String, String> {
+    validate_input(account, "account")?;
+    validate_input(key_type, "key_type")?;
     let service = format!("{}.{}", SERVICE_NAME, key_type);
     let output = Command::new("security")
         .args(["find-generic-password", "-s", &service, "-a", account, "-w"])
@@ -32,6 +46,8 @@ pub fn get_credential(account: &str, key_type: &str) -> Result<String, String> {
 }
 
 pub fn delete_credential(account: &str, key_type: &str) -> Result<(), String> {
+    validate_input(account, "account")?;
+    validate_input(key_type, "key_type")?;
     let service = format!("{}.{}", SERVICE_NAME, key_type);
     let _ = Command::new("security")
         .args(["delete-generic-password", "-s", &service, "-a", account])
