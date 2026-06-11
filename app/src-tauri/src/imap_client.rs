@@ -172,6 +172,10 @@ async fn return_session(key: String, session: AsyncImapSession) {
     POOL.lock().await.insert(key, session);
 }
 
+async fn drop_session(mut session: AsyncImapSession) {
+    let _ = session.logout().await;
+}
+
 fn extract_addr_str(addr: &imap_proto::types::Address) -> String {
     let mb = addr.mailbox.as_ref().map(|m| String::from_utf8_lossy(m).to_string()).unwrap_or_default();
     let host = addr.host.as_ref().map(|h| String::from_utf8_lossy(h).to_string()).unwrap_or_default();
@@ -251,7 +255,7 @@ pub async fn fetch_list(config: &AccountConfig, folder: &str, count: u32) -> Res
             Ok(results)
         }
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -295,7 +299,7 @@ pub async fn fetch_mail_page(config: &AccountConfig, folder: &str, offset: u32, 
             Ok((results, total))
         }
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -304,7 +308,8 @@ pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, lim
     let result = async {
         let imap_folder = resolve_folder(&config.email, folder);
         session.select(&imap_folder).await.map_err(|e| format!("フォルダ選択失敗: {e}"))?;
-        let sanitized_query = query.replace(['"', '\r', '\n', '\0'], "");
+        let sanitized_query = query.replace(['"', '\r', '\n', '\0', '{', '}', '\\', '\t'], "");
+        let sanitized_query = sanitized_query.chars().filter(|c| !c.is_control()).collect::<String>();
         let gmail_query = format!("X-GM-RAW \"{}\"", sanitized_query);
         let uids: Vec<u32> = match session.uid_search(&gmail_query).await {
             Ok(set) => set.into_iter().collect(),
@@ -318,11 +323,12 @@ pub async fn search_mails(config: &AccountConfig, folder: &str, query: &str, lim
         results.sort_by(|a, b| b.uid.cmp(&a.uid));
         Ok(results)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
 pub async fn fetch_new_mails(config: &AccountConfig, folder: &str, since_uid: u32) -> Result<Vec<MailSummary>, String> {
+    if since_uid == u32::MAX { return Ok(vec![]); }
     let (key, mut session) = get_session(config).await?;
     let result = async {
         let imap_folder = resolve_folder(&config.email, folder);
@@ -346,7 +352,7 @@ pub async fn fetch_new_mails(config: &AccountConfig, folder: &str, since_uid: u3
         results.reverse();
         Ok(results)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -397,7 +403,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
         CACHE.lock().unwrap_or_else(|e| e.into_inner()).insert(uid, detail.clone());
         Ok(detail)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -446,7 +452,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
         if !ics_entries.is_empty() { let mut ics_cache = ICS_CACHE.lock().unwrap_or_else(|e| e.into_inner()); for (k, v) in ics_entries { ics_cache.insert(k, v); } }
         Ok(count)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -458,7 +464,7 @@ pub async fn archive_mail(config: &AccountConfig, folder: &str, uid: u32) -> Res
         session.uid_mv(uid.to_string(), &dest).await.map_err(|e| format!("アーカイブ失敗: {e}"))?;
         Ok("アーカイブ完了".into())
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -470,7 +476,7 @@ pub async fn delete_mail(config: &AccountConfig, folder: &str, uid: u32) -> Resu
         session.uid_mv(uid.to_string(), &dest).await.map_err(|e| format!("削除失敗: {e}"))?;
         Ok("削除完了".into())
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -488,7 +494,7 @@ pub async fn toggle_star(config: &AccountConfig, folder: &str, uid: u32, add: bo
         }
         Ok(if add { "スター追加" } else { "スター解除" }.into())
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -507,7 +513,7 @@ pub async fn fetch_folders(config: &AccountConfig) -> Result<Vec<FolderInfo>, St
         }
         Ok(result)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -517,7 +523,8 @@ pub async fn fetch_thread(config: &AccountConfig, folder: &str, subject: &str) -
     let result = async {
         session.select(resolve_folder(&config.email, folder)).await.map_err(|e| format!("{e}"))?;
         let clean_subject = subject.trim_start_matches("Re: ").trim_start_matches("Fwd: ");
-        let sanitized = clean_subject.replace(['"', '\r', '\n', '\0'], "");
+        let sanitized = clean_subject.replace(['"', '\r', '\n', '\0', '{', '}', '\\', '\t'], "");
+        let sanitized = sanitized.chars().filter(|c| !c.is_control()).collect::<String>();
         let query = format!("SUBJECT \"{}\"", sanitized);
         let uids: HashSet<u32> = session.uid_search(&query).await.map_err(|e| format!("検索失敗: {e}"))?;
         if uids.is_empty() { return Ok(vec![]); }
@@ -539,14 +546,17 @@ pub async fn fetch_thread(config: &AccountConfig, folder: &str, subject: &str) -
         }
         Ok(results)
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
 pub async fn download_attachment(config: &AccountConfig, folder: &str, uid: u32, part_index: usize, filename: &str) -> Result<String, String> {
     let data = fetch_attachment_bytes(config, folder, uid, part_index).await?;
     let downloads = dirs::download_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let path = downloads.join(filename);
+    let safe_filename = std::path::Path::new(filename)
+        .file_name()
+        .unwrap_or_else(|| std::ffi::OsStr::new("attachment"));
+    let path = downloads.join(safe_filename);
     std::fs::write(&path, &data).map_err(|e| format!("保存失敗: {e}"))?;
     Ok(path.to_string_lossy().to_string())
 }
@@ -574,7 +584,7 @@ pub async fn fetch_attachment_bytes(config: &AccountConfig, folder: &str, uid: u
         let part = parsed.subparts.get(part_index).ok_or("パートが見つかりません".to_string())?;
         part.get_body_raw().map_err(|e| format!("{e}"))
     }.await;
-    if result.is_ok() { return_session(key, session).await; }
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
 }
 
@@ -591,6 +601,7 @@ pub async fn fetch_new_mails_with_session(
     _folder: &str,
     since_uid: u32,
 ) -> Result<Vec<MailSummary>, String> {
+    if since_uid == u32::MAX { return Ok(vec![]); }
     let range = format!("{}:*", since_uid + 1);
     let messages: Vec<_> = session.uid_fetch(&range, "(UID FLAGS ENVELOPE)").await
         .map_err(|e| format!("差分取得失敗: {e}"))?
