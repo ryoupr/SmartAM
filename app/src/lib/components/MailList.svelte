@@ -118,21 +118,23 @@
     <div class="empty">読み込み中...</div>
   {:else}
     <div class="scroll-area" onscroll={handleScroll} bind:this={scrollEl}>
-      <div class="virtual-container" style:height="{totalHeight}px">
-        <div class="virtual-offset" style:transform="translateY({offsetY}px)">
-          {#each visibleMails as mail (mail.uid)}
-            <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
-              <div class="mail-header">
-                <span class="from">{mail.from}</span>
-                <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
-              </div>
-              <div class="subject">{mail.subject}</div>
-            </button>
-          {:else}
-            <div class="empty">メールがありません</div>
-          {/each}
+      {#if mails.length === 0}
+        <div class="empty">メールがありません</div>
+      {:else}
+        <div class="virtual-container" style:height="{totalHeight}px">
+          <div class="virtual-offset" style:transform="translateY({offsetY}px)">
+            {#each visibleMails as mail (mail.uid)}
+              <button class="mail-item" class:selected={selectedUid === mail.uid || selectedUids.has(mail.uid)} class:unread={!mail.seen} data-uid={mail.uid} onclick={(e) => handleClick(mail.uid, e)}>
+                <div class="mail-header">
+                  <span class="from">{mail.from}</span>
+                  <span class="date">{formatMailDate(mail.date, dateFormat, timezone)}</span>
+                </div>
+                <div class="subject">{mail.subject}</div>
+              </button>
+            {/each}
+          </div>
         </div>
-      </div>
+      {/if}
       {#if loadingMore}
         <div class="loading-more">読み込み中...</div>
       {/if}
@@ -141,7 +143,7 @@
 </div>
 
 <style>
-  .mail-list { width:380px;min-width:380px;border-right:1px solid var(--surface1);display:flex;flex-direction:column;overflow:hidden }
+  .mail-list { width:380px;min-width:380px;border-right:1px solid var(--surface1);display:flex;flex-direction:column;overflow:hidden;height:100%;min-height:0 }
   .list-header { display:flex;align-items:center;padding:12px 12px 4px;gap:8px;flex-shrink:0 }
   .list-title { font-size:17px;font-weight:700;color:var(--ink, var(--text)) }
   .list-count { font-size:11px;color:var(--ink-60, var(--overlay));flex:1 }

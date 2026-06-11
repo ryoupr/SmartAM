@@ -89,20 +89,26 @@
     try {
       const newMails = await fetchNewMailsSince(settings, activeFolder, Math.max(...mails.map(m => m.uid)));
       if (newMails.length > 0) {
-        mails = [...newMails, ...mails]; syncStatus = `${newMails.length}件の新着`; setTimeout(() => { syncStatus = ''; }, 3000);
-        invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: newMails.map(m => m.uid) }).catch(() => {});
-        await sendNotificationForNewMails(settings, newMails, mails, trace);
+        const existingUids = new Set(mails.map(m => m.uid));
+        const deduped = newMails.filter(m => !existingUids.has(m.uid));
+        if (deduped.length > 0) {
+          mails = [...deduped, ...mails]; syncStatus = `${deduped.length}件の新着`; setTimeout(() => { syncStatus = ''; }, 3000);
+          invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: deduped.map(m => m.uid) }).catch(() => {});
+          await sendNotificationForNewMails(settings, deduped, mails, trace);
+        }
       }
     } catch (e) { trace('POLL', `fetch_new_mails error: ${e}`); }
   }
 
   async function loadMoreMails() {
     if (!hasMore || loadingMore) return; const a = acc(); if (!a) return;
+    const folderAtStart = activeFolder;
     await ensureValidToken(); loadingMore = true;
     try {
-      const [page, total] = await fetchMailPage(settings, activeFolder, mailOffset, ps);
+      const [page, total] = await fetchMailPage(settings, folderAtStart, mailOffset, ps);
+      if (activeFolder !== folderAtStart) return;
       if (page.length === 0) { hasMore = false; }
-      else { mails = [...mails, ...page]; mailOffset += page.length; hasMore = mailOffset < total; saveFolderCache(); invoke('preload_mails', { config: getImapConfig(a), folder: activeFolder, uids: page.map(m => m.uid) }).catch(() => {}); }
+      else { mails = [...mails, ...page]; mailOffset += page.length; hasMore = mailOffset < total; saveFolderCache(); invoke('preload_mails', { config: getImapConfig(a), folder: folderAtStart, uids: page.map(m => m.uid) }).catch(() => {}); }
     } catch (e) { error = String(e); } finally { loadingMore = false; }
   }
 
@@ -147,7 +153,9 @@
 
   async function handleSelect(uid: number) {
     const a = acc(); if (!a) return;
-    const t0 = performance.now(); await ensureValidToken(); const t1 = performance.now(); selectedUid = uid;
+    selectedUid = uid;
+    const t0 = performance.now(); await ensureValidToken(); const t1 = performance.now();
+    if (selectedUid !== uid) return;
     try {
       const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder: activeFolder, uid });
       if (selectedUid !== uid) return; selectedMail = detail;
@@ -263,7 +271,9 @@
       const { listen } = await import('@tauri-apps/api/event');
       await listen<{ account_index: number; mails: typeof mails }>('new-mail', (event) => {
         if (event.payload.account_index === settings.activeAccountIndex) {
-          const newMails = event.payload.mails;
+          const existingUids = new Set(mails.map(m => m.uid));
+          const newMails = event.payload.mails.filter(m => !existingUids.has(m.uid));
+          if (newMails.length === 0) return;
           mails = [...newMails, ...mails];
           syncStatus = `${newMails.length}件の新着`;
           setTimeout(() => { syncStatus = ''; }, 3000);
