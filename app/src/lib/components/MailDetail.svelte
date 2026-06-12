@@ -110,6 +110,8 @@
     if (!iframeEl) return;
     const handleMessage = (e: MessageEvent) => {
       if (e.source !== iframeEl?.contentWindow) return;
+      // srcdoc iframeのoriginは'null'になるのでそれも検証
+      if (e.origin !== 'null' && e.origin !== window.location.origin) return;
       if (e.data?.type === 'resize' && typeof e.data.height === 'number') {
         iframeHeight = e.data.height;
       }
@@ -129,8 +131,13 @@
     // Remove <script> tags and inline event handlers
     s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
     s = s.replace(/<style[\s\S]*?<\/style>/gi, '');
-    s = s.replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
-    s = s.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+    // Remove inline event handlers (resilient to whitespace/newline tricks)
+    s = s.replace(/\son[a-z]+\s*=\s*["'][^"']*["']/gi, '');
+    s = s.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
+    // Remove dangerous URI schemes in href/src attributes
+    s = s.replace(/\s(href|src)\s*=\s*["']?\s*(javascript|data|vbscript):[^"'>]*/gi, '');
+    // Remove dangerous tags
+    s = s.replace(/<(iframe|object|embed|form|base|meta|link|applet)[\s\S]*?(\/?>|<\/\1>)/gi, '');
     // Strip document structure tags to prevent nested <html> in srcdoc
     s = s.replace(/<\/?html[^>]*>/gi, '');
     s = s.replace(/<head[\s\S]*?<\/head>/gi, '');
