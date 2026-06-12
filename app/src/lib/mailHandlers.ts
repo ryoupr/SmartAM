@@ -26,6 +26,7 @@ export interface PageState {
   setSelectedUids: (s: Set<number>) => void;
   setError: (e: string | null) => void;
   setLastUndo: (fn: (() => void) | null) => void;
+  setDetailLoading?: (v: boolean) => void;
 }
 
 export async function doArchive(ctx: PageState): Promise<void> {
@@ -58,7 +59,7 @@ export async function doBulkDelete(ctx: PageState): Promise<void> {
   const a = ctx.settings.accounts[ctx.settings.activeAccountIndex];
   if (!a || ctx.selectedUids.size === 0) return;
   const uids = [...ctx.selectedUids]; await ctx.ensureValidToken();
-  for (const uid of uids) { try { await deleteMail(a, ctx.activeFolder, uid); } catch {} }
+  await Promise.allSettled(uids.map(uid => deleteMail(a, ctx.activeFolder, uid)));
   ctx.setMails(ctx.mails.filter(m => !new Set(uids).has(m.uid)));
   ctx.setSelectedMail(null); ctx.setSelectedUid(null); ctx.setSelectedUids(new Set());
   ctx.showToast(`🗑 ${uids.length}件削除しました`);
@@ -68,7 +69,7 @@ export async function doBulkStar(ctx: PageState, add: boolean): Promise<void> {
   const a = ctx.settings.accounts[ctx.settings.activeAccountIndex];
   if (!a || ctx.selectedUids.size === 0) return;
   await ctx.ensureValidToken();
-  for (const uid of [...ctx.selectedUids]) { try { await toggleStar(a, ctx.activeFolder, uid, add); } catch {} }
+  await Promise.allSettled([...ctx.selectedUids].map(uid => toggleStar(a, ctx.activeFolder, uid, add)));
   ctx.showToast(add ? `⭐ ${ctx.selectedUids.size}件にスター追加` : `⭐ ${ctx.selectedUids.size}件のスター解除`);
   ctx.setSelectedUids(new Set());
 }
@@ -106,11 +107,12 @@ export async function doSelect(ctx: PageState, uid: number, trace: (tag: string,
   if (!a) return;
   const t0 = performance.now(); await ctx.ensureValidToken(); const t1 = performance.now();
   ctx.setSelectedUid(uid);
+  ctx.setDetailLoading?.(true);
   try {
     const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(a), folder: ctx.activeFolder, uid });
     if (ctx.selectedUid !== uid) return;
     ctx.setSelectedMail(detail);
-    const m = ctx.mails.find(x => x.uid === uid); if (m && !m.seen) { m.seen = true; ctx.setMails(ctx.mails); }
+    const m = ctx.mails.find(x => x.uid === uid); if (m && !m.seen) { m.seen = true; ctx.setMails(ctx.mails); invoke('mark_mail_seen', { config: getImapConfig(a), folder: ctx.activeFolder, uid }).catch(() => {}); }
     trace('PERF', `select uid=${uid}: token=${(t1-t0)|0}ms, fetch=${(performance.now()-t1)|0}ms`);
     const idx = ctx.mails.findIndex(m => m.uid === uid);
     if (idx >= 0) {
@@ -118,4 +120,5 @@ export async function doSelect(ctx: PageState, uid: number, trace: (tag: string,
       if (nearby.length > 0) invoke('preload_mails', { config: getImapConfig(a), folder: ctx.activeFolder, uids: nearby }).catch(() => {});
     }
   } catch (e) { ctx.setError(String(e)); }
+  finally { ctx.setDetailLoading?.(false); }
 }

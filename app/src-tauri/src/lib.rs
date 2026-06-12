@@ -131,6 +131,11 @@ async fn fetch_mail_detail(config: AccountConfig, folder: String, uid: u32) -> R
 }
 
 #[tauri::command]
+async fn mark_mail_seen(config: AccountConfig, folder: String, uid: u32) -> Result<String, String> {
+    imap_client::mark_seen(&config, &folder, uid).await
+}
+
+#[tauri::command]
 async fn search_mails(config: AccountConfig, folder: String, query: String, limit: u32) -> Result<Vec<MailSummary>, String> {
     log::debug!("search_mails: folder={} query={} limit={}", folder, query, limit);
     imap_client::search_mails(&config, &folder, &query, limit).await
@@ -752,7 +757,7 @@ pub fn run() {
             frontend_trace, set_log_level,
             test_imap_connection, fetch_mail_list, fetch_mail_detail, fetch_new_mails, fetch_mail_page, search_mails,
             fetch_folders, fetch_thread, download_attachment, fetch_attachment_data,
-            archive_mail, delete_mail, toggle_star,
+            archive_mail, delete_mail, toggle_star, mark_mail_seen,
             preload_mails, set_mail_cache_max,
             send_mail, send_mail_with_attachments,
             list_bedrock_models,

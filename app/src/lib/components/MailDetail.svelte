@@ -109,6 +109,10 @@
   $effect(() => {
     if (!iframeEl) return;
     const handleMessage = (e: MessageEvent) => {
+      if (e.source !== iframeEl?.contentWindow) return;
+      if (e.data?.type === 'resize' && typeof e.data.height === 'number') {
+        iframeHeight = e.data.height;
+      }
       if (e.data?.type === 'link-click' && typeof e.data.href === 'string') {
         const href = e.data.href;
         if (href.startsWith('http://') || href.startsWith('https://')) {
@@ -117,20 +121,14 @@
       }
     };
     window.addEventListener('message', handleMessage);
-    const adjustHeight = () => {
-      try {
-        const doc = iframeEl!.contentDocument;
-        if (doc?.body) { iframeHeight = doc.body.scrollHeight + 16; }
-      } catch {}
-    };
-    iframeEl.addEventListener('load', adjustHeight);
-    return () => { window.removeEventListener('message', handleMessage); iframeEl?.removeEventListener('load', adjustHeight); };
+    return () => { window.removeEventListener('message', handleMessage); };
   });
 
   function sanitizeHtml(html: string): string {
     let s = html;
     // Remove <script> tags and inline event handlers
     s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
+    s = s.replace(/<style[\s\S]*?<\/style>/gi, '');
     s = s.replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
     s = s.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
     // Strip document structure tags to prevent nested <html> in srcdoc
@@ -152,12 +150,17 @@ td,th{padding:4px 8px;word-break:break-word}
 a{color:#1e66f5;cursor:pointer}
 blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 *{max-width:100%;box-sizing:border-box}
-</style><script>document.addEventListener('DOMContentLoaded',function(){document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});});<\/script></head><body>${safe}</body></html>`;
+@media (prefers-color-scheme: dark) {
+  body { background: #1e1e2e; color: #cdd6f4 }
+  a { color: #89b4fa }
+  blockquote { border-left-color: #585b70; color: #a6adc8 }
+}
+</style><script>document.addEventListener('DOMContentLoaded',function(){var notify=function(){window.parent.postMessage({type:'resize',height:document.body.scrollHeight+16},'*');};notify();new ResizeObserver(notify).observe(document.body);document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});});<\/script></head><body>${safe}</body></html>`;
   }
 
   function linkifyText(text: string): string {
-    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return escaped.replace(/(https?:\/\/[^\s<>&]+)/g, '<a href="$1">$1</a>');
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return escaped.replace(/(https?:\/\/[^\s<>&"]+)/g, '<a href="$1" rel="noopener noreferrer">$1</a>');
   }
 
   function togglePanel(type: string) {
@@ -210,8 +213,8 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   }
 
   function renderMd(text: string): string {
-    text = text.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
-    return text
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped
       .replace(/^### (.+)$/gm, '<h3>$1</h3>')
       .replace(/^## (.+)$/gm, '<h2>$1</h2>')
       .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -234,6 +237,8 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
       <h2 class="subject">{mail.subject}</h2>
       <div class="meta">From: {mail.from}  |  {formatMailDate(mail.date, dateFormat, timezone)}</div>
       <div class="meta">To: {mail.to}</div>
+      {#if mail.cc}<div class="meta">Cc: {mail.cc}</div>{/if}
+      {#if mail.bcc}<div class="meta">Bcc: {mail.bcc}</div>{/if}
     </div>
     <div class="actions">
       <Button icon="reply" label="返信" title="返信" onclick={onReply} />
@@ -298,12 +303,12 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-same-origin allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-same-origin allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
     {:else if mail.body_text.trim()}
       <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
@@ -354,7 +359,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   .attachments { display:flex;gap:6px;margin:8px 0;flex-wrap:wrap }
   .att-chip { padding:4px 10px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px;cursor:pointer }
   .att-chip:hover { border-color:var(--mauve) }
-  .body { font-size:13px;line-height:1.7;white-space:pre-wrap;margin-top:12px;background:#fff;color:#1a1a1a;padding:16px;border-radius:8px }
+  .body { font-size:13px;line-height:1.7;white-space:pre-wrap;margin-top:12px;background:var(--paper-wh, #fff);color:var(--ink, #1a1a1a);padding:16px;border-radius:8px }
   .body :global(a) { color:#1e66f5 }
   .mail-iframe { width:100%;border:none;margin-top:12px;border-radius:8px;background:#fff }
   .mail-iframe.translated { border:1px solid var(--blue) }
