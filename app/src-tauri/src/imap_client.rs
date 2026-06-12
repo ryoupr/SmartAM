@@ -16,8 +16,8 @@ static POOL: LazyLock<TokioMutex<HashMap<String, AsyncImapSession>>> =
 const CACHE_HARD_LIMIT_BYTES: usize = 1_073_741_824;
 
 struct MailCache {
-    map: HashMap<u32, MailDetail>,
-    order: VecDeque<u32>,
+    map: HashMap<String, MailDetail>,
+    order: VecDeque<String>,
     estimated_bytes: usize,
 }
 
@@ -28,24 +28,25 @@ impl MailCache {
             + detail.to.len() + detail.subject.len() + detail.date.len()
             + detail.attachments.len() * 64 + 128
     }
-    fn get(&mut self, uid: &u32) -> Option<&MailDetail> {
-        if self.map.contains_key(uid) {
-            self.order.retain(|u| u != uid);
-            self.order.push_back(*uid);
-            self.map.get(uid)
+    fn get(&mut self, key: &str) -> Option<&MailDetail> {
+        if self.map.contains_key(key) {
+            let k = key.to_string();
+            self.order.retain(|u| u != &k);
+            self.order.push_back(k);
+            self.map.get(key)
         } else { None }
     }
-    fn insert(&mut self, uid: u32, detail: MailDetail) {
+    fn insert(&mut self, key: String, detail: MailDetail) {
         let max = CACHE_MAX.load(Ordering::Relaxed);
         let entry_size = Self::estimate_size(&detail);
-        if self.map.contains_key(&uid) {
-            if let Some(old) = self.map.get(&uid) {
+        if self.map.contains_key(&key) {
+            if let Some(old) = self.map.get(&key) {
                 self.estimated_bytes = self.estimated_bytes.saturating_sub(Self::estimate_size(old));
             }
-            self.order.retain(|u| *u != uid);
+            self.order.retain(|u| u != &key);
         }
-        self.map.insert(uid, detail);
-        self.order.push_back(uid);
+        self.map.insert(key.clone(), detail);
+        self.order.push_back(key);
         self.estimated_bytes += entry_size;
         self.evict(max);
     }
@@ -58,12 +59,31 @@ impl MailCache {
             }
         }
     }
-    fn contains_key(&self, uid: &u32) -> bool { self.map.contains_key(uid) }
+    fn contains_key(&self, key: &str) -> bool { self.map.contains_key(key) }
+}
+
+struct IcsCache {
+    map: HashMap<String, String>,
+    order: VecDeque<String>,
+}
+impl IcsCache {
+    fn new() -> Self { Self { map: HashMap::new(), order: VecDeque::new() } }
+    fn get(&self, key: &str) -> Option<&String> { self.map.get(key) }
+    fn insert(&mut self, key: String, value: String) {
+        if self.map.contains_key(&key) {
+            self.order.retain(|k| k != &key);
+        }
+        self.map.insert(key.clone(), value);
+        self.order.push_back(key);
+        while self.order.len() > 50 {
+            if let Some(old) = self.order.pop_front() { self.map.remove(&old); }
+        }
+    }
 }
 
 static CACHE: LazyLock<Mutex<MailCache>> = LazyLock::new(|| Mutex::new(MailCache::new()));
 static CACHE_MAX: AtomicUsize = AtomicUsize::new(100);
-static ICS_CACHE: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static ICS_CACHE: LazyLock<Mutex<IcsCache>> = LazyLock::new(|| Mutex::new(IcsCache::new()));
 static FOLDER_MAP: LazyLock<Mutex<HashMap<String, HashMap<String, String>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub fn set_cache_max(max: usize) {
@@ -388,7 +408,8 @@ fn parse_mail_detail(uid: u32, msg: &async_imap::types::Fetch) -> Result<MailDet
 }
 
 pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Result<MailDetail, String> {
-    if let Some(detail) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&uid) {
+    let cache_key = format!("{}:{}:{}", config.email, folder, uid);
+    if let Some(detail) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&cache_key) {
         return Ok(detail.clone());
     }
     let (key, mut session) = get_session(config).await?;
@@ -400,7 +421,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
             .map_err(|e| format!("メール取得失敗: {e}"))?;
         let msg = messages.first().ok_or("メールが見つかりません".to_string())?;
         let detail = parse_mail_detail(uid, msg)?;
-        CACHE.lock().unwrap_or_else(|e| e.into_inner()).insert(uid, detail.clone());
+        CACHE.lock().unwrap_or_else(|e| e.into_inner()).insert(format!("{}:{}:{}", config.email, folder, uid), detail.clone());
         Ok(detail)
     }.await;
     if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
@@ -410,7 +431,7 @@ pub async fn fetch_detail(config: &AccountConfig, folder: &str, uid: u32) -> Res
 pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>) -> Result<u32, String> {
     let uncached: Vec<u32> = {
         let cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        uids.into_iter().filter(|uid| !cache.contains_key(uid)).collect()
+        uids.into_iter().filter(|uid| !cache.contains_key(&format!("{}:{}:{}", config.email, folder, uid))).collect()
     };
     if uncached.is_empty() { return Ok(0); }
     let (key, mut session) = get_session(config).await?;
@@ -423,7 +444,7 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
             .map_err(|e| format!("プリロード失敗: {e}"))?;
         let mut count = 0u32;
         let mut ics_entries: Vec<(String, String)> = Vec::new();
-        let mut details_to_cache: Vec<(u32, MailDetail)> = Vec::new();
+        let mut details_to_cache: Vec<(String, MailDetail)> = Vec::new();
         for msg in &messages {
             let uid = msg.uid.unwrap_or(0);
             if uid == 0 { continue; }
@@ -444,11 +465,11 @@ pub async fn preload_mails(config: &AccountConfig, folder: &str, uids: Vec<u32>)
                         }
                     }
                 }
-                details_to_cache.push((uid, detail));
+                details_to_cache.push((format!("{}:{}:{}", config.email, folder, uid), detail));
                 count += 1;
             }
         }
-        { let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner()); for (uid, detail) in details_to_cache { cache.insert(uid, detail); } }
+        { let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner()); for (k, detail) in details_to_cache { cache.insert(k, detail); } }
         if !ics_entries.is_empty() { let mut ics_cache = ICS_CACHE.lock().unwrap_or_else(|e| e.into_inner()); for (k, v) in ics_entries { ics_cache.insert(k, v); } }
         Ok(count)
     }.await;
@@ -493,6 +514,18 @@ pub async fn toggle_star(config: &AccountConfig, folder: &str, uid: u32, add: bo
                 .try_collect::<Vec<_>>().await;
         }
         Ok(if add { "スター追加" } else { "スター解除" }.into())
+    }.await;
+    if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
+    result
+}
+
+pub async fn mark_seen(config: &AccountConfig, folder: &str, uid: u32) -> Result<String, String> {
+    let (key, mut session) = get_session(config).await?;
+    let result = async {
+        session.select(resolve_folder(&config.email, folder)).await.map_err(|e| format!("{e}"))?;
+        let _ = session.uid_store(uid.to_string(), "+FLAGS (\\Seen)").await.map_err(|e| format!("{e}"))?
+            .try_collect::<Vec<_>>().await;
+        Ok("既読にしました".into())
     }.await;
     if result.is_ok() { return_session(key, session).await; } else { drop_session(session).await; }
     result
@@ -570,6 +603,7 @@ pub async fn fetch_attachment_data(config: &AccountConfig, folder: &str, uid: u3
     Ok(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data))
 }
 
+// TODO: BODY[n]セクション指定フェッチで指定パートのみ取得する最適化（async_imapの動作確認後）
 pub async fn fetch_attachment_bytes(config: &AccountConfig, folder: &str, uid: u32, part_index: usize) -> Result<Vec<u8>, String> {
     let (key, mut session) = get_session(config).await?;
     let result = async {

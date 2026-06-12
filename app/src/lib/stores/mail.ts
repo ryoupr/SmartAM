@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { MailSummary, MailDetail as MailDetailType, AccountConfig } from '$lib/types';
 import { getImapConfig } from '$lib/store';
 import type { Account } from '$lib/store';
+import { refreshOAuthToken } from '$lib/mailSync';
 
 // State
 let mails = $state<MailSummary[]>([]);
@@ -15,6 +16,7 @@ let syncing = $state(false);
 let syncStatus = $state('');
 let searchQuery = $state('');
 let searchResults = $state<MailSummary[] | null>(null);
+let detailLoading = $state(false);
 
 let mailOffset = 0;
 
@@ -22,11 +24,10 @@ async function ensureValidToken(account: Account, onTokenRefreshed?: (account: A
   if (account.auth_type !== 'oauth') return;
   const now = Math.floor(Date.now() / 1000);
   if (account.token_expires_at > now + 60) return;
-  const tokens = await invoke<{ access_token: string; refresh_token: string; expires_at: number }>(
-    'google_oauth_refresh', { refreshToken: account.refresh_token }
-  );
-  account.access_token = tokens.access_token;
-  account.token_expires_at = tokens.expires_at;
+  const settings = { accounts: [account], activeAccountIndex: 0 } as any;
+  await refreshOAuthToken(settings, 0);
+  account.access_token = settings.accounts[0].access_token;
+  account.token_expires_at = settings.accounts[0].token_expires_at;
   onTokenRefreshed?.(account);
 }
 
@@ -73,6 +74,7 @@ async function loadMore(account: Account, pageSize = 200, onTokenRefreshed?: (a:
 async function selectMail(account: Account, uid: number, onTokenRefreshed?: (a: Account) => void) {
   await ensureValidToken(account, onTokenRefreshed);
   selectedUid = uid;
+  detailLoading = true;
   const folder = activeFolder;
   try {
     const detail = await invoke<MailDetailType>('fetch_mail_detail', { config: getImapConfig(account), folder, uid });
@@ -88,6 +90,7 @@ async function selectMail(account: Account, uid: number, onTokenRefreshed?: (a: 
       if (nearby.length > 0) invoke('preload_mails', { config: getImapConfig(account), folder, uids: nearby }).catch(() => {});
     }
   } catch (e) { error = String(e); }
+  finally { detailLoading = false; }
 }
 
 async function archiveMail(account: Account, uid: number, onUndo?: () => void, onTokenRefreshed?: (a: Account) => void) {
@@ -161,6 +164,7 @@ export function getMailStore() {
     get hasMore() { return hasMore; },
     get syncing() { return syncing; },
     get syncStatus() { return syncStatus; },
+    get detailLoading() { return detailLoading; },
     get searchQuery() { return searchQuery; },
     get filteredMails() { return searchResults !== null ? searchResults : mails; },
     set error(v: string | null) { error = v; },
