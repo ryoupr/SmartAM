@@ -108,21 +108,34 @@
 
   $effect(() => {
     if (!iframeEl) return;
-    const handleMessage = (e: MessageEvent) => {
-      // srcdoc iframe (sandbox without allow-same-origin) は origin 'null' を持つ
-      if (e.origin !== 'null') return;
-      if (e.data?.type === 'resize' && typeof e.data.height === 'number') {
-        iframeHeight = e.data.height;
-      }
-      if (e.data?.type === 'link-click' && typeof e.data.href === 'string') {
-        const href = e.data.href;
-        if (href.startsWith('http://') || href.startsWith('https://')) {
-          invoke('open_external_url', { url: href }).catch(() => {});
-        }
-      }
+    const adjustHeight = () => {
+      try {
+        const doc = iframeEl!.contentDocument;
+        if (doc?.body) { iframeHeight = doc.body.scrollHeight + 16; }
+      } catch {}
     };
-    window.addEventListener('message', handleMessage);
-    return () => { window.removeEventListener('message', handleMessage); };
+    const setupLinks = () => {
+      try {
+        const doc = iframeEl!.contentDocument;
+        if (!doc) return;
+        doc.addEventListener('click', (e: Event) => {
+          const a = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null;
+          if (a) {
+            e.preventDefault();
+            const href = a.getAttribute('href');
+            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+              invoke('open_external_url', { url: href }).catch(() => {});
+            }
+          }
+        });
+      } catch {}
+    };
+    const onLoad = () => { adjustHeight(); setupLinks(); };
+    iframeEl.addEventListener('load', onLoad);
+    // Observe for delayed image loads
+    const interval = setInterval(adjustHeight, 500);
+    setTimeout(() => clearInterval(interval), 5000);
+    return () => { iframeEl?.removeEventListener('load', onLoad); clearInterval(interval); };
   });
 
   function sanitizeHtml(html: string): string {
@@ -148,7 +161,7 @@
 
   function buildSrcdoc(html: string): string {
     const safe = sanitizeHtml(html);
-    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; script-src 'unsafe-inline'"><style>
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
 img{max-width:100%;height:auto}
 table{border-collapse:collapse;max-width:100%;width:100%}
@@ -161,7 +174,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   a { color: #89b4fa }
   blockquote { border-left-color: #585b70; color: #a6adc8 }
 }
-</style><script>document.addEventListener('DOMContentLoaded',function(){var notify=function(){window.parent.postMessage({type:'resize',height:document.body.scrollHeight+16},'*');};notify();new ResizeObserver(notify).observe(document.body);document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'link-click',href:a.getAttribute('href')},'*');}});});<\/script></head><body>${safe}</body></html>`;
+</style></head><body>${safe}</body></html>`;
   }
 
   function linkifyText(text: string): string {
@@ -309,12 +322,12 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
     {:else if mail.body_text.trim()}
       <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
