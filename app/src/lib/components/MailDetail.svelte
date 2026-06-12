@@ -109,9 +109,8 @@
   $effect(() => {
     if (!iframeEl) return;
     const handleMessage = (e: MessageEvent) => {
-      if (e.source !== iframeEl?.contentWindow) return;
-      // srcdoc iframeのoriginは'null'になるのでそれも検証
-      if (e.origin !== 'null' && e.origin !== window.location.origin) return;
+      // srcdoc iframe (sandbox without allow-same-origin) は origin 'null' を持つ
+      if (e.origin !== 'null') return;
       if (e.data?.type === 'resize' && typeof e.data.height === 'number') {
         iframeHeight = e.data.height;
       }

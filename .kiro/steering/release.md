@@ -23,8 +23,9 @@
 
 ```bash
 git push -u origin feature/xxx
-gh pr create --base develop --title "feat: ..." --body "..." --reviewer @copilot
-# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
+gh pr create --base develop --title "feat: ..." --body "..."
+# AI サブエージェントでセキュリティレビュー実施
+# Major 指摘に対応 → push → PRコメントにレビューログ記録
 # GitHub上でマージ → feature ブランチ削除
 git checkout develop && git pull origin develop
 ```
@@ -42,8 +43,8 @@ git push origin develop
 ### 3. develop → main を PR マージ
 
 ```bash
-gh pr create --base main --head develop --title "release: vX.Y.Z" --body "バージョン X.Y.Z リリース" --reviewer @copilot
-# Copilot レビュー結果を確認 → 対応が必要な指摘は修正して push
+gh pr create --base main --head develop --title "release: vX.Y.Z" --body "バージョン X.Y.Z リリース"
+# feature PR でレビュー済みのためコメント記録のみ
 # GitHub上でマージ（⚠️ develop を削除しない）
 git checkout main && git pull origin main
 ```
@@ -52,6 +53,11 @@ git checkout main && git pull origin main
 
 ```bash
 cd app && npx tauri build
+```
+
+mise shim が壊れている場合:
+```bash
+cd app && PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" RUSTC_WRAPPER="" npx tauri build
 ```
 
 成功時の出力に以下が含まれることを確認:
@@ -125,6 +131,8 @@ curl -sL https://github.com/ryoupr/SmartAM/releases/latest/download/latest.json 
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
+| `cargo is not a valid shim` | mise の Rust shim 壊れ | `PATH="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin:..." RUSTC_WRAPPER="" npx tauri build` |
+| `sccache: error: Compiler not supported` | sccache が mise shim 経由で rustc を見つけられない | `RUSTC_WRAPPER=""` を設定してビルド |
 | `A public key has been found, but no private key` | `TAURI_SIGNING_PRIVATE_KEY` 未設定 | `.env` を確認、`mise env \| grep TAURI` で検証 |
 | `--private-key cannot be used with --private-key-path` | `TAURI_SIGNING_PRIVATE_KEY_PATH` が残っている | `unset TAURI_SIGNING_PRIVATE_KEY_PATH` |
 | アプリのアップデートボタンが反応しない | `latest.json` の signature が不正、または `downloadAndInstall` の例外 | `latest.json` の内容を curl で確認、アプリログを確認 |
