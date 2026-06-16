@@ -106,36 +106,26 @@
     }
   });
 
+  // sandbox iframe（allow-scripts / same-origin なし）内の注入スクリプトから
+  // postMessage を受け取り、リンクは外部ブラウザで開き、本文高さを反映する。
+  // 親から contentDocument に click リスナーを張る方式は、scripting 無効の
+  // sandbox document では WebKit/WKWebView で発火しないため使えない。
+  // セキュリティ: 送信元(contentWindow)一致と http/https スキームを検証してから open。
   $effect(() => {
-    if (!iframeEl) return;
-    const adjustHeight = () => {
-      try {
-        const doc = iframeEl!.contentDocument;
-        if (doc?.body) { iframeHeight = doc.body.scrollHeight + 16; }
-      } catch {}
-    };
-    const setupLinks = () => {
-      try {
-        const doc = iframeEl!.contentDocument;
-        if (!doc) return;
-        doc.addEventListener('click', (e: Event) => {
-          const a = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null;
-          if (a) {
-            e.preventDefault();
-            const href = a.getAttribute('href');
-            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-              invoke('open_external_url', { url: href }).catch(() => {});
-            }
-          }
-        });
-      } catch {}
-    };
-    const onLoad = () => { adjustHeight(); setupLinks(); };
-    iframeEl.addEventListener('load', onLoad);
-    // Observe for delayed image loads
-    const interval = setInterval(adjustHeight, 500);
-    setTimeout(() => clearInterval(interval), 5000);
-    return () => { iframeEl?.removeEventListener('load', onLoad); clearInterval(interval); };
+    function onMessage(e: MessageEvent) {
+      if (!iframeEl || e.source !== iframeEl.contentWindow) return;
+      const d = e.data as { t?: string; h?: number; u?: string } | null;
+      if (!d || typeof d !== 'object') return;
+      if (d.t === 'smartam-h' && typeof d.h === 'number') {
+        iframeHeight = Math.max(40, Math.min(d.h, 20000));
+      } else if (d.t === 'smartam-link' && typeof d.u === 'string') {
+        if (d.u.startsWith('http://') || d.u.startsWith('https://')) {
+          invoke('open_external_url', { url: d.u }).catch(() => {});
+        }
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   });
 
   function sanitizeHtml(html: string): string {
@@ -156,12 +146,34 @@
     s = s.replace(/<\/?body[^>]*>/gi, '');
     // Remove any CSP meta tags that could conflict with our own
     s = s.replace(/<meta[^>]*Content-Security-Policy[^>]*>/gi, '');
+    // Neutralize anchor navigation: a sandboxed iframe must never self-navigate
+    // (otherwise clicking a link blanks the pane). Keep only http/https targets as
+    // data-href, which the delegated click handler opens in the external browser.
+    s = s.replace(/<a\b([^>]*)>/gi, (_tag, attrs: string) => {
+      const m = attrs.match(/\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const url = m ? (m[1] ?? m[2] ?? m[3] ?? '') : '';
+      const cleaned = attrs.replace(/\shref\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
+      return /^https?:\/\//i.test(url)
+        ? `<a${cleaned} data-href="${url.replace(/"/g, '&quot;')}">`
+        : `<a${cleaned}>`;
+    });
     return s;
   }
 
   function buildSrcdoc(html: string): string {
     const safe = sanitizeHtml(html);
-    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:"><style>
+    // 注入する信頼スクリプト。CSP の nonce で許可し、メール由来のスクリプトは
+    // sanitize 除去 + nonce 無しで CSP ブロックされる。same-origin を外した
+    // sandbox（allow-scripts のみ）内で click と本文高さを親へ postMessage する。
+    const nonce = crypto.randomUUID().replace(/-/g, '');
+    const bridge = `(function(){function s(m){parent.postMessage(m,'*');}`
+      + `function h(){s({t:'smartam-h',h:document.body.scrollHeight+16});}`
+      + `document.addEventListener('click',function(e){var t=e.target,a=t&&t.closest?t.closest('a[data-href]'):null;`
+      + `if(a){e.preventDefault();var u=a.getAttribute('data-href');if(u)s({t:'smartam-link',u:u});}});`
+      + `window.addEventListener('load',h);if(document.readyState!=='loading')h();`
+      + `try{new ResizeObserver(h).observe(document.body);}catch(_){}`
+      + `setTimeout(h,120);setTimeout(h,600);})();`;
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: https:"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
 img{max-width:100%;height:auto}
 table{border-collapse:collapse;max-width:100%;width:100%}
@@ -174,7 +186,7 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
   a { color: #89b4fa }
   blockquote { border-left-color: #585b70; color: #a6adc8 }
 }
-</style></head><body>${safe}</body></html>`;
+</style></head><body>${safe}<script nonce="${nonce}">${bridge}</scr` + `ipt></body></html>`;
   }
 
   function linkifyText(text: string): string {
@@ -322,12 +334,12 @@ blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
 
     {#if translatedBody !== null}
       {#if mail.body_html}
-        <iframe class="mail-iframe translated" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+        <iframe class="mail-iframe translated" title="メール本文(翻訳)" srcdoc={buildSrcdoc(translatedBody)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
       {:else}
         <div class="body translated">{translatedBody}</div>
       {/if}
     {:else if mail.body_html}
-      <iframe class="mail-iframe" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-same-origin" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
+      <iframe class="mail-iframe" title="メール本文" srcdoc={buildSrcdoc(mail.body_html)} sandbox="allow-scripts" style:height="{iframeHeight}px" bind:this={iframeEl}></iframe>
     {:else if mail.body_text.trim()}
       <div class="body">{@html linkifyText(mail.body_text)}</div>
     {/if}
