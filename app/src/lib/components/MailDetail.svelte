@@ -8,7 +8,7 @@
   import type { MailDetail, Attachment, CalendarEvent } from '$lib/types';
   import { formatMailDate } from '$lib/store';
 
-  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [], calendarProvider = 'apple', dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo' }: {
+  let { mail, onArchive, onDelete, onStar, onReply, onForward, onUseAiReply, onDownloadAttachment, onFetchAttachmentData, llmConfig, smtpConfig, calendarName = '仕事', calendarNames = [], calendarProvider = 'apple', dateFormat = 'YYYY/MM/DD HH:mm:ss', timezone = 'Asia/Tokyo', imageLoadingPolicy = 'allow', imageWhitelist = [] }: {
     mail: MailDetail | null;
     onArchive: () => void;
     onDelete: () => void;
@@ -25,7 +25,28 @@
     calendarProvider?: string;
     dateFormat?: string;
     timezone?: string;
+    imageLoadingPolicy?: 'block' | 'whitelist' | 'allow';
+    imageWhitelist?: string[];
   } = $props();
+
+  // リモート画像の表示可否。policy=block は常に不可、allow は常に可、
+  // whitelist は送信者(From)がホワイトリスト(メール or ドメイン)に一致する場合のみ可。
+  function senderAllowed(from: string, list: string[]): boolean {
+    if (!from || !list || list.length === 0) return false;
+    const m = from.match(/<([^>]+)>/);
+    const addr = (m ? m[1] : from).trim().toLowerCase();
+    const domain = addr.includes('@') ? addr.slice(addr.indexOf('@') + 1) : '';
+    return list.some((e) => {
+      const entry = e.trim().toLowerCase();
+      if (!entry) return false;
+      return addr === entry || domain === entry || addr.endsWith('@' + entry) || (domain !== '' && domain.endsWith('.' + entry));
+    });
+  }
+  const imagesAllowed = $derived(
+    imageLoadingPolicy === 'allow' ? true :
+    imageLoadingPolicy === 'block' ? false :
+    senderAllowed(mail?.from ?? '', imageWhitelist)
+  );
 
   let openPanels: Set<string> = $state(new Set());
   let starred = $state(false);
@@ -173,7 +194,8 @@
       + `window.addEventListener('load',h);if(document.readyState!=='loading')h();`
       + `try{new ResizeObserver(h).observe(document.body);}catch(_){}`
       + `setTimeout(h,120);setTimeout(h,600);})();`;
-    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: https:"><style>
+    const imgSrc = imagesAllowed ? 'img-src data: https:' : 'img-src data:';
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
 img{max-width:100%;height:auto}
 table{border-collapse:collapse;max-width:100%;width:100%}

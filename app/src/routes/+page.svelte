@@ -314,6 +314,7 @@
     llmConfig={llm()} smtpConfig={acc() ? getSmtpConfig(acc()!) : null}
     calendarName={acc()?.calendar?.calendarName ?? '仕事'} calendarProvider={acc()?.calendar?.provider ?? 'apple'}
     {calendarNames} dateFormat={settings.dateFormat} timezone={settings.timezone}
+    imageLoadingPolicy={settings.imageLoadingPolicy} imageWhitelist={settings.imageWhitelist}
   />
 </div>
 
