@@ -402,13 +402,13 @@ async fn fetch_pricing_from_service(
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     log::info!("open_external_url called: {url}");
-    if !url.starts_with("https://") {
-        log::warn!("open_external_url rejected (non-https): {url}");
-        return Err("HTTPSのURLのみ開けます".into());
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        log::warn!("open_external_url rejected (non-http(s)): {url}");
+        return Err("http/https のURLのみ開けます".into());
     }
     // open クレートの open::that は LaunchServices 受理時点で exit0 を返し
     // 実際にはブラウザが開かない事象があるため、OAuth で実績のある
-    // `open` コマンドの直接 spawn に統一する。url は https 検証済み・argv 渡し。
+    // `open` コマンドの直接 spawn に統一する。url は http/https 検証済み・argv 渡し。
     match std::process::Command::new("open").arg(&url).spawn() {
         Ok(_) => {
             log::info!("open_external_url: opened ok");
