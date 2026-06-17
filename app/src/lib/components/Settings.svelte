@@ -84,6 +84,20 @@
               <option value="trace">Trace</option>
             </select>
           </label>
+          <label class="fl">リモート画像の読み込み
+            <select bind:value={local.imageLoadingPolicy}>
+              <option value="allow">すべて許可</option>
+              <option value="block">常にブロック</option>
+              <option value="whitelist">送信者ホワイトリストのみ許可</option>
+            </select>
+          </label>
+          <p class="fl-hint">メール内のリモート画像は開封トラッキングに使われることがあります。ブロックすると一部の画像は表示されません。</p>
+          {#if local.imageLoadingPolicy === 'whitelist'}
+            <label class="fl">画像を許可する送信者（メールアドレスまたはドメイン、1行に1件）
+              <textarea rows="5" value={(local.imageWhitelist ?? []).join(String.fromCharCode(10))} onchange={(e) => local.imageWhitelist = (e.currentTarget as HTMLTextAreaElement).value.split(String.fromCharCode(10)).map((s) => s.trim()).filter(Boolean)}></textarea>
+            </label>
+            <p class="fl-hint">送信者は From ヘッダで判定します（DKIM/SPF 未検証のため、なりすましメールには完全な防御ではありません）。</p>
+          {/if}
         {:else if activeTab === 'about'}
           <h3>SmartAM</h3>
           <div class="about-card">
@@ -124,7 +138,9 @@
   .content { flex:1;padding:16px 24px;overflow-y:auto }
   .content h3 { font-size:14px;margin-bottom:12px }
   .fl { display:block;color:var(--overlay);font-size:10px;margin:6px 0 2px }
-  .fl input,.fl select { display:block;width:100%;padding:5px 8px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:11px;margin-top:2px }
+  .fl input,.fl select,.fl textarea { display:block;width:100%;padding:5px 8px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:11px;margin-top:2px }
+  .fl textarea { resize:vertical;font-family:inherit;line-height:1.5 }
+  .fl-hint { font-size:10px;color:var(--overlay);margin:2px 0 10px }
   .ftr { display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--surface1) }
   .btn-save { padding:8px 24px;border-radius:6px;border:none;background:var(--mauve);color:var(--base);font-weight:700;cursor:pointer }
   .btn-sm { padding:4px 12px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);color:var(--text);font-size:10px;cursor:pointer }

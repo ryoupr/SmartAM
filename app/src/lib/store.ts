@@ -64,6 +64,8 @@ export interface AppSettings {
   logLevel: LogLevel;
   theme: 'dark' | 'light';
   notificationSoundName: string;
+  imageLoadingPolicy: 'block' | 'whitelist' | 'allow';
+  imageWhitelist: string[];
 }
 
 export const DEFAULT_ACCOUNT_EXTRAS = {
@@ -94,6 +96,8 @@ export const DEFAULTS: AppSettings = {
   logLevel: 'info' as LogLevel,
   theme: 'light' as const,
   notificationSoundName: 'default',
+  imageLoadingPolicy: 'allow',
+  imageWhitelist: [],
 };
 
 let _store: Awaited<ReturnType<typeof load>> | null = null;
