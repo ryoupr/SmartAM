@@ -31,15 +31,19 @@
 
   // リモート画像の表示可否。policy=block は常に不可、allow は常に可、
   // whitelist は送信者(From)がホワイトリスト(メール or ドメイン)に一致する場合のみ可。
+  // 実アドレスは最後の <...> を採用（表示名に埋め込んだ偽 <...> に騙されないため）。
+  // 注意: From は DKIM/SPF 未検証で詐称可能。本ホワイトリストはセキュリティ境界では
+  // なく「すべて許可」より厳しくする利便性目的（非一致は fail-safe でブロック）。
   function senderAllowed(from: string, list: string[]): boolean {
     if (!from || !list || list.length === 0) return false;
-    const m = from.match(/<([^>]+)>/);
-    const addr = (m ? m[1] : from).trim().toLowerCase();
+    const angles = from.match(/<([^>]+)>/g);
+    const addr = (angles && angles.length ? angles[angles.length - 1].slice(1, -1) : from).trim().toLowerCase();
+    if (!addr) return false;
     const domain = addr.includes('@') ? addr.slice(addr.indexOf('@') + 1) : '';
     return list.some((e) => {
-      const entry = e.trim().toLowerCase();
+      const entry = e.trim().toLowerCase().replace(/^@/, '');
       if (!entry) return false;
-      return addr === entry || domain === entry || addr.endsWith('@' + entry) || (domain !== '' && domain.endsWith('.' + entry));
+      return addr === entry || domain === entry || (domain !== '' && domain.endsWith('.' + entry));
     });
   }
   const imagesAllowed = $derived(

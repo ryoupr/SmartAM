@@ -96,6 +96,7 @@
             <label class="fl">画像を許可する送信者（メールアドレスまたはドメイン、1行に1件）
               <textarea rows="5" value={(local.imageWhitelist ?? []).join(String.fromCharCode(10))} onchange={(e) => local.imageWhitelist = (e.currentTarget as HTMLTextAreaElement).value.split(String.fromCharCode(10)).map((s) => s.trim()).filter(Boolean)}></textarea>
             </label>
+            <p class="fl-hint">送信者は From ヘッダで判定します（DKIM/SPF 未検証のため、なりすましメールには完全な防御ではありません）。</p>
           {/if}
         {:else if activeTab === 'about'}
           <h3>SmartAM</h3>
