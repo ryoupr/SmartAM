@@ -1,3 +1,38 @@
+<script module lang="ts">
+  import DOMPurify from 'dompurify';
+
+  // メール本文の sanitize（DOMPurify）。script/style/iframe 等の危険タグ・イベントハンドラ・
+  // 危険スキームを除去し、http(s) リンクのみ data-href 化する（sandbox iframe の自己ナビゲーションを
+  // 防ぎ、クリックは bridge 経由で外部ブラウザに開く）。それ以外の href は除去。
+  // フックは初回 sanitize 時に一度だけ登録（モジュールスコープ）。ビルド時(window 無し)の
+  // 実行を避けるため、addHook は import 時ではなく遅延登録する。
+  let _hookReady = false;
+  // 注意: addHook は DOMPurify シングルトン全体に作用する（このアプリでは sanitizeHtml 専用）。
+  function ensureHook() {
+    if (_hookReady) return;
+    _hookReady = true;
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+      const el = node as Element;
+      if (el.tagName && el.tagName.toUpperCase() === 'A') {
+        const href = el.getAttribute('href') ?? '';
+        el.removeAttribute('href');
+        // 受信側(onMessage)の検証とスキーム判定を揃える（http(s):// のみ data-href 化）。
+        const low = href.toLowerCase();
+        if (low.startsWith('http://') || low.startsWith('https://')) el.setAttribute('data-href', href);
+      }
+    });
+  }
+
+  function sanitizeHtml(html: string): string {
+    ensureHook();
+    return DOMPurify.sanitize(html, {
+      FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'base', 'meta', 'link', 'applet'],
+      FORBID_ATTR: ['data-href'],
+      WHOLE_DOCUMENT: false
+    }) as string;
+  }
+</script>
+
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { slide } from 'svelte/transition';
@@ -153,37 +188,7 @@
     return () => window.removeEventListener('message', onMessage);
   });
 
-  function sanitizeHtml(html: string): string {
-    let s = html;
-    // Remove <script> tags and inline event handlers
-    s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
-    s = s.replace(/<style[\s\S]*?<\/style>/gi, '');
-    // Remove inline event handlers (resilient to whitespace/newline tricks)
-    s = s.replace(/\son[a-z]+\s*=\s*["'][^"']*["']/gi, '');
-    s = s.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
-    // Remove dangerous URI schemes in href/src attributes
-    s = s.replace(/\s(href|src)\s*=\s*["']?\s*(javascript|data|vbscript):[^"'>]*/gi, '');
-    // Remove dangerous tags
-    s = s.replace(/<(iframe|object|embed|form|base|meta|link|applet)[\s\S]*?(\/?>|<\/\1>)/gi, '');
-    // Strip document structure tags to prevent nested <html> in srcdoc
-    s = s.replace(/<\/?html[^>]*>/gi, '');
-    s = s.replace(/<head[\s\S]*?<\/head>/gi, '');
-    s = s.replace(/<\/?body[^>]*>/gi, '');
-    // Remove any CSP meta tags that could conflict with our own
-    s = s.replace(/<meta[^>]*Content-Security-Policy[^>]*>/gi, '');
-    // Neutralize anchor navigation: a sandboxed iframe must never self-navigate
-    // (otherwise clicking a link blanks the pane). Keep only http/https targets as
-    // data-href, which the delegated click handler opens in the external browser.
-    s = s.replace(/<a\b([^>]*)>/gi, (_tag, attrs: string) => {
-      const m = attrs.match(/\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-      const url = m ? (m[1] ?? m[2] ?? m[3] ?? '') : '';
-      const cleaned = attrs.replace(/\shref\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
-      return /^https?:\/\//i.test(url)
-        ? `<a${cleaned} data-href="${url.replace(/"/g, '&quot;')}">`
-        : `<a${cleaned}>`;
-    });
-    return s;
-  }
+  // sanitizeHtml は上部の <script module>（DOMPurify ベース）で定義。buildSrcdoc から利用する。
 
   // 高さ計測 + リンク仲介の信頼スクリプト。same-origin を外した sandbox
   // (allow-scripts のみ) 内で click と本文高さを親へ postMessage する。
