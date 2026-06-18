@@ -1,11 +1,11 @@
 {
 	"name": "app",
 	"private": true,
-	"version": "0.4.18",
+	"version": "0.4.19",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "node scripts/check-csp-hash.mjs && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
