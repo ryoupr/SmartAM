@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: asset: https://www.googleapis.com https://accounts.google.com; script-src 'self' 'unsafe-inline' 'sha256-bmpHzIAjEvo96wDx7r3zIwTVZQICNAyu4yhmDzfdhsQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:"
+      "csp": "default-src 'self' tauri: asset: https://www.googleapis.com https://accounts.google.com; script-src 'self' 'unsafe-inline' 'sha256-kBpUS99EzyiAa+EExDeIIVeNRAMmytcKTyrvO12zk+4='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:"
     }
   },
   "bundle": {
