@@ -7,15 +7,18 @@
   // フックは初回 sanitize 時に一度だけ登録（モジュールスコープ）。ビルド時(window 無し)の
   // 実行を避けるため、addHook は import 時ではなく遅延登録する。
   let _hookReady = false;
+  // 注意: addHook は DOMPurify シングルトン全体に作用する（このアプリでは sanitizeHtml 専用）。
   function ensureHook() {
     if (_hookReady) return;
     _hookReady = true;
     DOMPurify.addHook('afterSanitizeAttributes', (node) => {
       const el = node as Element;
-      if (el.tagName === 'A') {
+      if (el.tagName && el.tagName.toUpperCase() === 'A') {
         const href = el.getAttribute('href') ?? '';
         el.removeAttribute('href');
-        if (/^https?:/i.test(href)) el.setAttribute('data-href', href);
+        // 受信側(onMessage)の検証とスキーム判定を揃える（http(s):// のみ data-href 化）。
+        const low = href.toLowerCase();
+        if (low.startsWith('http://') || low.startsWith('https://')) el.setAttribute('data-href', href);
       }
     });
   }
