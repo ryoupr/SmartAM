@@ -16,6 +16,7 @@
 - `.env` は `.gitignore` 済み — 絶対にコミットしない
 - `TAURI_SIGNING_PRIVATE_KEY` / OAuth credentials はローカルの `.env` で管理
 - API keys (LLM providers 等) は Tauri Store (`settings.json`) でユーザーローカルに保存
+- **メール本文 iframe の CSP ハッシュ**: `MailDetail.svelte` の `MAIL_BRIDGE_JS`（srcdoc iframe に注入する高さ計測+リンク仲介スクリプト）を変更したら、**必ず SHA-256 を再計算して `app/src-tauri/tauri.conf.json` の `script-src` の `'sha256-...'` を更新する**。本番ビルドでは srcdoc が Tauri のメイン CSP を継承し、Tauri が `script-src` に nonce を注入して `'unsafe-inline'` が無効化されるため、ハッシュ未登録だと本番のみ bridge がブロックされ本文高さが伸びない（`tauri dev` では再現しない）。再計算は `MAIL_BRIDGE_JS`(utf8) の SHA-256 を base64 化し `sha256-` を前置。
 
 ## ログ
 
