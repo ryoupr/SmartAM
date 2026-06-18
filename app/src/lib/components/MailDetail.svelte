@@ -185,19 +185,19 @@
     return s;
   }
 
+  // 高さ計測 + リンク仲介の信頼スクリプト。same-origin を外した sandbox
+  // (allow-scripts のみ) 内で click と本文高さを親へ postMessage する。
+  // ⚠️ 本番ビルドでは srcdoc が Tauri の CSP を継承し、Tauri が script-src に nonce を
+  //   注入して 'unsafe-inline' が無効化される。よってこのスクリプトの SHA-256 を
+  //   tauri.conf.json の script-src に 'sha256-...' として登録し実行を許可している。
+  //   この文字列を変更したら必ず再計算: SHA-256(MAIL_BRIDGE_JS, utf8) を base64 化し
+  //   'sha256-' を前置して tauri.conf.json を更新すること。
+  const MAIL_BRIDGE_JS = `(function(){function s(m){parent.postMessage(m,'*');}function h(){s({t:'smartam-h',h:document.body.scrollHeight+16});}document.addEventListener('click',function(e){var t=e.target,a=t&&t.closest?t.closest('a[data-href]'):null;if(a){e.preventDefault();var u=a.getAttribute('data-href');if(u)s({t:'smartam-link',u:u});}});window.addEventListener('load',h);if(document.readyState!=='loading')h();try{new ResizeObserver(h).observe(document.body);}catch(_){}setTimeout(h,120);setTimeout(h,600);})();`;
+
   function buildSrcdoc(html: string): string {
     const safe = sanitizeHtml(html);
-    // 注入する信頼スクリプト。CSP の nonce で許可し、メール由来のスクリプトは
-    // sanitize 除去 + nonce 無しで CSP ブロックされる。same-origin を外した
-    // sandbox（allow-scripts のみ）内で click と本文高さを親へ postMessage する。
     const nonce = crypto.randomUUID().replace(/-/g, '');
-    const bridge = `(function(){function s(m){parent.postMessage(m,'*');}`
-      + `function h(){s({t:'smartam-h',h:document.body.scrollHeight+16});}`
-      + `document.addEventListener('click',function(e){var t=e.target,a=t&&t.closest?t.closest('a[data-href]'):null;`
-      + `if(a){e.preventDefault();var u=a.getAttribute('data-href');if(u)s({t:'smartam-link',u:u});}});`
-      + `window.addEventListener('load',h);if(document.readyState!=='loading')h();`
-      + `try{new ResizeObserver(h).observe(document.body);}catch(_){}`
-      + `setTimeout(h,120);setTimeout(h,600);})();`;
+    const bridge = MAIL_BRIDGE_JS;
     const imgSrc = imagesAllowed ? 'img-src data: https:' : 'img-src data:';
     return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}

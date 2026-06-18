@@ -160,6 +160,8 @@ npm run check            # TypeScript type check
 cd src-tauri && cargo check   # Rust check (fast feedback)
 ```
 
+> ⚠️ **メール本文 iframe の CSP ハッシュ**: `app/src/lib/components/MailDetail.svelte` の `MAIL_BRIDGE_JS`（メール本文 srcdoc に注入する高さ計測・リンク仲介スクリプト）を変更したら、その SHA-256 を `app/src-tauri/tauri.conf.json` の `script-src`（`'sha256-...'`）に反映すること。本番ビルドでは srcdoc が Tauri の CSP を継承し、未反映だと本文の高さ計測 bridge がブロックされる（`tauri dev` では再現しない）。
+
 ### Design Docs
 
 - `ai-native-mailer.md` — 全機能要件・技術スタック・開発フェーズ
