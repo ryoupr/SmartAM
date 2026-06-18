@@ -192,14 +192,18 @@
   //   tauri.conf.json の script-src に 'sha256-...' として登録し実行を許可している。
   //   この文字列を変更したら必ず再計算: SHA-256(MAIL_BRIDGE_JS, utf8) を base64 化し
   //   'sha256-' を前置して tauri.conf.json を更新すること。
-  const MAIL_BRIDGE_JS = `(function(){function s(m){parent.postMessage(m,'*');}function h(){s({t:'smartam-h',h:document.body.scrollHeight+16});}document.addEventListener('click',function(e){var t=e.target,a=t&&t.closest?t.closest('a[data-href]'):null;if(a){e.preventDefault();var u=a.getAttribute('data-href');if(u)s({t:'smartam-link',u:u});}});window.addEventListener('load',h);if(document.readyState!=='loading')h();try{new ResizeObserver(h).observe(document.body);}catch(_){}setTimeout(h,120);setTimeout(h,600);})();`;
+  const MAIL_BRIDGE_JS = `(function(){var PO=(document.querySelector('meta[name=smartam-po]')||{}).content||'*';function s(m){parent.postMessage(m,PO);}function h(){s({t:'smartam-h',h:document.body.scrollHeight+16});}document.addEventListener('click',function(e){var t=e.target,a=t&&t.closest?t.closest('a[data-href]'):null;if(a){e.preventDefault();var u=a.getAttribute('data-href');if(u)s({t:'smartam-link',u:u});}});window.addEventListener('load',h);if(document.readyState!=='loading')h();try{new ResizeObserver(h).observe(document.body);}catch(_){}setTimeout(h,120);setTimeout(h,600);})();`;
 
   function buildSrcdoc(html: string): string {
     const safe = sanitizeHtml(html);
     const nonce = crypto.randomUUID().replace(/-/g, '');
     const bridge = MAIL_BRIDGE_JS;
+    // bridge の postMessage 送信先(targetOrigin)を親オリジンに限定するため meta で注入。
+    // 親オリジンは可変(dev: http://localhost:5173 / 本番: tauri オリジン)なので
+    // script 本体(=ハッシュ対象)には含めず meta 経由で渡す（ハッシュ安定維持）。
+    const po = (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '').replace(/"/g, '&quot;');
     const imgSrc = imagesAllowed ? 'img-src data: https:' : 'img-src data:';
-    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><style>
+    return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><meta name="smartam-po" content="${po}"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
 img{max-width:100%;height:auto}
 table{border-collapse:collapse;max-width:100%;width:100%}
