@@ -201,7 +201,7 @@
     // bridge の postMessage 送信先(targetOrigin)を親オリジンに限定するため meta で注入。
     // 親オリジンは可変(dev: http://localhost:5173 / 本番: tauri オリジン)なので
     // script 本体(=ハッシュ対象)には含めず meta 経由で渡す（ハッシュ安定維持）。
-    const po = (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '').replace(/"/g, '&quot;');
+    const po = (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     const imgSrc = imagesAllowed ? 'img-src data: https:' : 'img-src data:';
     return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><meta name="smartam-po" content="${po}"><style>
 body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}

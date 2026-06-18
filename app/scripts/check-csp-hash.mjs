@@ -13,7 +13,7 @@ const mailDetailPath = fileURLToPath(new URL('../src/lib/components/MailDetail.s
 const tauriConfPath = fileURLToPath(new URL('../src-tauri/tauri.conf.json', import.meta.url));
 
 const src = readFileSync(mailDetailPath, 'utf8');
-const m = src.match(/const MAIL_BRIDGE_JS = `([^`]*)`/);
+const m = src.match(/const MAIL_BRIDGE_JS\s*=\s*`([^`]*)`/);
 if (!m) {
   console.error('[csp-hash] MAIL_BRIDGE_JS が MailDetail.svelte に見つかりません');
   process.exit(1);
