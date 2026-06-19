@@ -208,19 +208,14 @@
     // script 本体(=ハッシュ対象)には含めず meta 経由で渡す（ハッシュ安定維持）。
     const po = (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     const imgSrc = imagesAllowed ? 'img-src data: https:' : 'img-src data:';
+    // メール本文のスタイルには干渉しない方針:
+    // - color-scheme:light で UA 既定を白背景・黒文字に固定（OSのダーク反転を抑止）
+    // - body の余白と横はみ出し抑止、画像の最大幅のみ最小限で付与
+    // 色・フォント・リンク色・表・引用などはメール側/UA既定のまま尊重する。
     return `<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; ${imgSrc}"><meta name="smartam-po" content="${po}"><style>
-body{margin:0;padding:16px;font:13px/1.7 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;background:#fff;word-break:break-word;overflow-x:hidden}
+:root{color-scheme:light}
+body{margin:0;padding:16px;overflow-x:hidden}
 img{max-width:100%;height:auto}
-table{border-collapse:collapse;max-width:100%;width:100%}
-td,th{padding:4px 8px;word-break:break-word}
-a{color:#1e66f5;cursor:pointer}
-blockquote{border-left:3px solid #ddd;padding-left:12px;margin:8px 0;color:#666}
-*{max-width:100%;box-sizing:border-box}
-@media (prefers-color-scheme: dark) {
-  body { background: #1e1e2e; color: #cdd6f4 }
-  a { color: #89b4fa }
-  blockquote { border-left-color: #585b70; color: #a6adc8 }
-}
 </style></head><body>${safe}<script nonce="${nonce}">${bridge}</scr` + `ipt></body></html>`;
   }
 
